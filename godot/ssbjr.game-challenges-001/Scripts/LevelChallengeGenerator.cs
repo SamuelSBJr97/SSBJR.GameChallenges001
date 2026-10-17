@@ -12,46 +12,89 @@ public partial class LevelChallenge
 		TargetTopology.Clear();
 		generatedFaces.Clear();
 
-		// 1. Inicia o primeiro bloco no centro
 		TargetTopology.Add(Vector3I.Zero);
-		generatedFaces[Vector3I.Zero] = new FaceType[6]; // Começa tudo Flat
-
 		Vector3I[] dirs = { Vector3I.Up, Vector3I.Down, Vector3I.Right, Vector3I.Left, Vector3I.Forward, Vector3I.Back };
-		List<Vector3I> existingNodes = new List<Vector3I> { Vector3I.Zero };
 
-		// 2. Crescimento em Árvore (Garante solução única e 100% de encaixe)
+		// 1. Geração de GRAFO COMPACTO (Aglomerados em vez de linhas)
 		while (TargetTopology.Count < BlocksToGenerate)
 		{
-			Vector3I randomExisting = existingNodes[rng.RandiRange(0, existingNodes.Count - 1)];
-			Vector3I randomDir = dirs[rng.RandiRange(0, 5)];
-			Vector3I newHole = randomExisting + randomDir;
-
-			if (!TargetTopology.Contains(newHole))
+			Dictionary<Vector3I, int> holeScores = new Dictionary<Vector3I, int>();
+			foreach (Vector3I pos in TargetTopology)
 			{
-				TargetTopology.Add(newHole);
-				existingNodes.Add(newHole);
-				generatedFaces[newHole] = new FaceType[6]; // Inicializa a zero (Flat)
+				foreach (Vector3I dir in dirs)
+				{
+					Vector3I hole = pos + dir;
+					if (!TargetTopology.Contains(hole))
+					{
+						if (holeScores.ContainsKey(hole)) holeScores[hole]++;
+						else holeScores[hole] = 1;
+					}
+				}
+			}
 
-				// 3. Cria a fechadura (Macho/Fêmea) EXCLUSIVAMENTE nesta ligação!
-				int shapeType = rng.RandiRange(0, 2);
-				FaceType faceExt = FaceType.Flat, faceInt = FaceType.Flat;
+			// Pega nos buracos com mais vizinhos para forçar a criação de blocos compactos (loops)
+			int maxScore = holeScores.Values.Max();
+			var bestHoles = holeScores.Where(k => k.Value == maxScore || rng.Randf() > 0.8f).Select(k => k.Key).ToList();
+			Vector3I chosenHole = bestHoles[rng.RandiRange(0, bestHoles.Count - 1)];
 
-				if (shapeType == 0) { faceExt = FaceType.QuadExt; faceInt = FaceType.QuadInt; }
-				else if (shapeType == 1) { faceExt = FaceType.CircExt; faceInt = FaceType.CircInt; }
-				else { faceExt = FaceType.CruzExt; faceInt = FaceType.CruzInt; }
+			TargetTopology.Add(chosenHole);
+		}
 
-				// Decide aleatoriamente qual bloco fica com o Macho e qual fica com a Fêmea
-				bool swap = rng.RandiRange(0, 1) == 1;
-				FaceType faceA = swap ? faceExt : faceInt;
-				FaceType faceB = swap ? faceInt : faceExt;
+		foreach (Vector3I pos in TargetTopology)
+			generatedFaces[pos] = new FaceType[6] { FaceType.Flat, FaceType.Flat, FaceType.Flat, FaceType.Flat, FaceType.Flat, FaceType.Flat };
 
-				// Atribui as faces exatamente no eixo de contacto
-				if (randomDir == Vector3I.Up)        { generatedFaces[randomExisting][0] = faceA; generatedFaces[newHole][1] = faceB; }
-				else if (randomDir == Vector3I.Down) { generatedFaces[randomExisting][1] = faceA; generatedFaces[newHole][0] = faceB; }
-				else if (randomDir == Vector3I.Right){ generatedFaces[randomExisting][2] = faceA; generatedFaces[newHole][3] = faceB; }
-				else if (randomDir == Vector3I.Left) { generatedFaces[randomExisting][3] = faceA; generatedFaces[newHole][2] = faceB; }
-				else if (randomDir == Vector3I.Forward){ generatedFaces[randomExisting][4] = faceA; generatedFaces[newHole][5] = faceB; }
-				else if (randomDir == Vector3I.Back) { generatedFaces[randomExisting][5] = faceA; generatedFaces[newHole][4] = faceB; }
+		// 2. Comprovação Matemática: Garante que TODAS as arestas internas se complementam
+		List<Vector3I> list = TargetTopology.ToList();
+		for (int i = 0; i < list.Count; i++)
+		{
+			for (int j = i + 1; j < list.Count; j++)
+			{
+				Vector3I diff = list[j] - list[i];
+				int dist = Mathf.Abs(diff.X) + Mathf.Abs(diff.Y) + Mathf.Abs(diff.Z);
+
+				if (dist == 1) // É um vizinho no Grafo
+				{
+					int shapeType = rng.RandiRange(0, 2);
+					FaceType faceA = FaceType.Flat, faceB = FaceType.Flat;
+
+					if (shapeType == 0) { faceA = FaceType.QuadExt; faceB = FaceType.QuadInt; }
+					else if (shapeType == 1) { faceA = FaceType.CircExt; faceB = FaceType.CircInt; }
+					else { faceA = FaceType.CruzExt; faceB = FaceType.CruzInt; }
+
+					bool swap = rng.RandiRange(0, 1) == 1;
+					FaceType finalA = swap ? faceA : faceB;
+					FaceType finalB = swap ? faceB : faceA;
+
+					if (diff == Vector3I.Right)      { generatedFaces[list[i]][2] = finalA; generatedFaces[list[j]][3] = finalB; }
+					else if (diff == Vector3I.Left)  { generatedFaces[list[i]][3] = finalA; generatedFaces[list[j]][2] = finalB; }
+					else if (diff == Vector3I.Up)    { generatedFaces[list[i]][0] = finalA; generatedFaces[list[j]][1] = finalB; }
+					else if (diff == Vector3I.Down)  { generatedFaces[list[i]][1] = finalA; generatedFaces[list[j]][0] = finalB; }
+					else if (diff == Vector3I.Back)  { generatedFaces[list[i]][5] = finalA; generatedFaces[list[j]][4] = finalB; }
+					else if (diff == Vector3I.Forward){generatedFaces[list[i]][4] = finalA; generatedFaces[list[j]][5] = finalB; }
+				}
+			}
+		}
+
+		// 3. Complexidade Visual: Adiciona conectores aleatórios às paredes exteriores (Topologia não-Flat)
+		foreach (Vector3I pos in TargetTopology)
+		{
+			for (int i = 0; i < 6; i++)
+			{
+				if (generatedFaces[pos][i] == FaceType.Flat)
+				{
+					if (rng.Randf() > 0.4f) // 60% de chance de ter uma face exterior maluca
+					{
+						int shapeType = rng.RandiRange(0, 2);
+						bool isExt = rng.RandiRange(0, 1) == 1;
+						FaceType f = FaceType.Flat;
+
+						if (shapeType == 0) f = isExt ? FaceType.QuadExt : FaceType.QuadInt;
+						else if (shapeType == 1) f = isExt ? FaceType.CircExt : FaceType.CircInt;
+						else f = isExt ? FaceType.CruzExt : FaceType.CruzInt;
+
+						generatedFaces[pos][i] = f;
+					}
+				}
 			}
 		}
 	}
@@ -63,29 +106,32 @@ public partial class LevelChallenge
 
 		foreach (var kvp in generatedFaces)
 		{
-			PuzzlePiece piece = new PuzzlePiece();
-			piece.TargetGridPosition = kvp.Key;
+			PuzzlePiece piece;
 			
+			// AGORA SIM: Instancia a cena completa com modelos 3D!
+			if (PieceScene != null) {
+				piece = PieceScene.Instantiate<PuzzlePiece>();
+			} else {
+				piece = new PuzzlePiece();
+				GD.PrintErr("ATENÇÃO: PieceScene não está definida no Inspector! A gerar caixas invisíveis.");
+			}
+
+			piece.TargetGridPosition = kvp.Key;
 			piece.Freeze = false;
 			piece.Mass = 1.0f;
 
-			CollisionShape3D collider = new CollisionShape3D();
-			collider.Shape = new BoxShape3D() { Size = new Vector3(2f, 2f, 2f) };
-			piece.AddChild(collider);
-
-			// Transfere as faces precisas para o bloco
 			for (int i = 0; i < 6; i++) piece.Faces[i] = kvp.Value[i];
 
 			AddChild(piece);
-			piece.GlobalPosition = new Vector3(rng.RandfRange(-10, 10), rng.RandfRange(15, 30), rng.RandfRange(-10, 10));
+
+			piece.GlobalPosition = new Vector3(rng.RandfRange(-15, 15), rng.RandfRange(15, 30), rng.RandfRange(-15, 15));
 			
-			// Dá uma rotação maluca (multiplos de 90 graus) para o jogador ter de descobrir
+			// Desorienta a peça para o jogador ter de descobrir o encaixe
 			float angle = Mathf.Pi / 2f;
-			piece.Rotation = new Vector3(
-				rng.RandiRange(0, 3) * angle, 
-				rng.RandiRange(0, 3) * angle, 
-				rng.RandiRange(0, 3) * angle
-			);
+			piece.Rotation = new Vector3(rng.RandiRange(0, 3) * angle, rng.RandiRange(0, 3) * angle, rng.RandiRange(0, 3) * angle);
+
+			// Chama o reconstrutor de visuais da sua peça (se existir)
+			if (piece.HasMethod("GenerateVisualsFromFaces")) piece.Call("GenerateVisualsFromFaces");
 		}
 	}
 
@@ -98,13 +144,7 @@ public partial class LevelChallenge
 		foreach (Node n in core.GetChildren())
 		{
 			if (n is PuzzlePiece p)
-			{
-				playerTopology.Add(new Vector3I(
-					Mathf.RoundToInt(p.GlobalPosition.X / 2f),
-					Mathf.RoundToInt(p.GlobalPosition.Y / 2f),
-					Mathf.RoundToInt(p.GlobalPosition.Z / 2f)
-				));
-			}
+				playerTopology.Add(new Vector3I(Mathf.RoundToInt(p.GlobalPosition.X / 2f), Mathf.RoundToInt(p.GlobalPosition.Y / 2f), Mathf.RoundToInt(p.GlobalPosition.Z / 2f)));
 		}
 
 		if (AreTopologiesMatch(TargetTopology, playerTopology))

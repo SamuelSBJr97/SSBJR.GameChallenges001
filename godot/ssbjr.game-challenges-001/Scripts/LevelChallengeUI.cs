@@ -24,15 +24,14 @@ public partial class LevelChallenge
 		uiContainer.Position = new Vector2(-420, 20); 
 		canvas.AddChild(uiContainer);
 
-		// Estilo Blueprint (Planta de Laboratório tipo Resident Evil)
+		// O Fundo da Planta recorta as imagens fora da margem
 		mapBackground = new ColorRect();
-		mapBackground.Color = new Color(0.02f, 0.05f, 0.1f, 0.95f); // Azul escuro profundo
+		mapBackground.Color = new Color(0.02f, 0.05f, 0.1f, 0.95f); 
 		mapBackground.Size = new Vector2(400, 320);
 		mapBackground.ClipContents = true; 
 		mapBackground.GuiInput += OnMapGuiInput;
 		uiContainer.AddChild(mapBackground);
 
-		// Tela interior deslizante
 		mapCanvas = new Control();
 		mapCanvas.Size = new Vector2(400, 320);
 		mapBackground.AddChild(mapCanvas);
@@ -43,9 +42,6 @@ public partial class LevelChallenge
 		label.LabelSettings = new LabelSettings() { FontSize = 12, FontColor = new Color(0.4f, 0.8f, 1.0f) };
 		uiContainer.AddChild(label);
 
-		// Define a posição inicial centrada
-		mapPan = new Vector2(0, 0); 
-		mapZoom = 0.8f; 
 		DrawFullTopology2D();
 		ApplyMapTransform();
 	}
@@ -60,14 +56,14 @@ public partial class LevelChallenge
 			if (mb.Pressed && (mb.ButtonIndex == MouseButton.WheelUp || mb.ButtonIndex == MouseButton.WheelDown))
 			{
 				float oldZoom = mapZoom;
-				
-				// Zoom multiplicativo para ser suave
 				if (mb.ButtonIndex == MouseButton.WheelUp) mapZoom = Mathf.Min(mapZoom * 1.2f, 4.0f);
 				if (mb.ButtonIndex == MouseButton.WheelDown) mapZoom = Mathf.Max(mapZoom / 1.2f, 0.2f);
 				
-				// Matemática Profissional: Zoom em direção ao cursor do rato
+				// Matemática de Zoom Local exata (centra na seta do rato)
 				Vector2 mousePos = mapBackground.GetLocalMousePosition();
-				mapPan = mousePos - (mousePos - mapPan) * (mapZoom / oldZoom);
+				Vector2 localPos = (mousePos - mapPan) / oldZoom;
+				mapPan = mousePos - localPos * mapZoom;
+				
 				ApplyMapTransform();
 			}
 		}
@@ -86,9 +82,9 @@ public partial class LevelChallenge
 
 	private void DrawFullTopology2D()
 	{
-		float cx = 200f; // Centro da tela
+		float cx = 200f; 
 		float cy = 160f;
-		float spacing = 90f; // Aproxima as cruzes para um aspeto mais interligado
+		float spacing = 90f; 
 		float iconSize = 26f; 
 
 		DrawTopologicalView(Vector3.Forward, Vector3.Right, Vector3.Up, new Vector2(cx, cy), iconSize);
@@ -140,7 +136,6 @@ public partial class LevelChallenge
 			icon.Size = new Vector2(iconSize, iconSize);
 			icon.Texture = GetFaceTexture(face);
 
-			// Borda azul clara para estilo planta baixa
 			ColorRect bg = new ColorRect();
 			bg.Color = new Color(0.1f, 0.3f, 0.5f, 0.8f);
 			bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
