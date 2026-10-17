@@ -136,26 +136,31 @@ public partial class OrbitCamera : Node3D
 		if (selectedPiece == null)
 		{
 			helpLabel.Text = "Clique: Selecionar  |  Dir: Câmera";
-			foreach (var icon in faceIcons) icon.Texture = null; // Esconde as faces
+			foreach (var icon in faceIcons) icon.Texture = null; 
 			return;
 		}
 
-		if (isHoldingCore)
-		{
-			helpLabel.Text = "Movendo Bloco Inteiro. Clique para fixar.";
-		}
-		else
-		{
-			helpLabel.Text = "Rotacionar: Setas e PgUp/PgDn";
-		}
+		helpLabel.Text = isHoldingCore ? "Movendo Bloco Inteiro." : "Rotacionar: Setas e PgUp/PgDn";
 
-		// Desenha o minimapa baseado na peça selecionada (solta ou a peça-alvo do grupo)
+		// Vetores achatados da câmara para o minimapa
+		Vector3 camForward = -camera.GlobalTransform.Basis.Z.Normalized();
+		Vector3 camRight = camera.GlobalTransform.Basis.X.Normalized();
+		camForward.Y = 0; camForward = camForward.Normalized();
+		camRight.Y = 0; camRight = camRight.Normalized();
+
+		// O que aponta PARA a câmara é o inverso da frente da câmara
+		Vector3 faceTowardsCamera = -camForward;
+		Vector3 faceAwayFromCamera = camForward;
+
+		// faceIcons: 0:Up, 1:Down, 2:Right, 3:Left, 4:Front(Camera), 5:Back
 		faceIcons[0].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(Vector3.Up));
 		faceIcons[1].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(Vector3.Down));
-		faceIcons[2].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(Vector3.Right));
-		faceIcons[3].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(Vector3.Left));
-		faceIcons[4].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(Vector3.Forward));
-		faceIcons[5].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(Vector3.Back));
+		
+		// Relativo à câmara
+		faceIcons[2].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(camRight));
+		faceIcons[3].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(-camRight));
+		faceIcons[4].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(faceTowardsCamera)); // Bloco central inferior
+		faceIcons[5].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(faceAwayFromCamera));
 	}
 
 	private Texture2D GetFaceTexture(FaceType type)
@@ -260,7 +265,7 @@ public partial class OrbitCamera : Node3D
 			}
 		}
 
-		// 2. LÓGICA DE SNAPPING DINÂMICO (Busca de Buracos)
+		// 2. LÓGICA DE SNAPPING DINÂMICO
 		if (selectedPiece != null && !isHoldingCore)
 		{
 			if (coreGroup.GetChildCount() == 0)
@@ -277,50 +282,44 @@ public partial class OrbitCamera : Node3D
 			else
 			{
 				Vector3 piecePos = selectedPiece.GlobalPosition;
-				Vector3I bestGridPos = Vector3I.Zero;
-				float minDistance = float.MaxValue;
+				Vector3 bestWorldPos = Vector3.Zero;
+				float minDistance = 4.0f; // Distância máxima de atração
+				isCurrentlyValidSnap = false;
+				bool foundSnap = false;
 
-				// Mapeia onde já existem peças coladas
-				System.Collections.Generic.HashSet<Vector3I> occupiedSlots = new System.Collections.Generic.HashSet<Vector3I>();
+				// Percorre TODAS as peças do Core e verifica as 6 posições adjacentes a cada uma delas no MUNDO
+				Vector3[] dirs = { Vector3.Up * 2f, Vector3.Down * 2f, Vector3.Right * 2f, Vector3.Left * 2f, Vector3.Forward * 2f, Vector3.Back * 2f };
+				
 				foreach (Node node in coreGroup.GetChildren())
 				{
 					if (node is PuzzlePiece p)
 					{
-						occupiedSlots.Add(new Vector3I(Mathf.RoundToInt(p.GlobalPosition.X/2f), Mathf.RoundToInt(p.GlobalPosition.Y/2f), Mathf.RoundToInt(p.GlobalPosition.Z/2f)));
+						foreach (Vector3 d in dirs)
+						{
+							Vector3 checkPos = p.GlobalPosition + d;
+							float dist = piecePos.DistanceTo(checkPos);
+							
+							if (dist < minDistance)
+							{
+								// Transforma para Grid para usar a validação
+								Vector3I checkGrid = new Vector3I(Mathf.RoundToInt(checkPos.X/2f), Mathf.RoundToInt(checkPos.Y/2f), Mathf.RoundToInt(checkPos.Z/2f));
+								
+								// Valida se é um espaço livre e válido
+								bool isValid = ValidateSpecificSnapPosition(checkGrid);
+								
+								// Quer seja vermelho ou verde, atraímos a luz se for o mais próximo!
+								minDistance = dist;
+								bestWorldPos = checkPos;
+								isCurrentlyValidSnap = isValid;
+								foundSnap = true;
+								currentSnapWorldPos = bestWorldPos;
+							}
+						}
 					}
 				}
 
-				// Encontra todos os "buracos" vazios vizinhos às peças do Core
-				Vector3I[] dirs = { Vector3I.Up, Vector3I.Down, Vector3I.Right, Vector3I.Left, Vector3I.Forward, Vector3I.Back };
-				System.Collections.Generic.HashSet<Vector3I> adjacentSlots = new System.Collections.Generic.HashSet<Vector3I>();
-				
-				foreach (Vector3I occ in occupiedSlots)
+				if (foundSnap)
 				{
-					foreach (Vector3I dir in dirs)
-					{
-						Vector3I adj = occ + dir;
-						if (!occupiedSlots.Contains(adj)) adjacentSlots.Add(adj);
-					}
-				}
-
-				// Procura o buraco que está mais próximo da peça que temos na mão
-				foreach (Vector3I adj in adjacentSlots)
-				{
-					Vector3 worldPos = new Vector3(adj.X * 2f, adj.Y * 2f, adj.Z * 2f);
-					float dist = piecePos.DistanceTo(worldPos);
-					if (dist < minDistance)
-					{
-						minDistance = dist;
-						bestGridPos = adj;
-					}
-				}
-
-				// Margem generosa de atração: mesmo que a peça esteja solta no ar, o cubo fantasma liga-se ao buraco!
-				if (minDistance <= 3.0f)
-				{
-					currentSnapWorldPos = new Vector3(bestGridPos.X * 2f, bestGridPos.Y * 2f, bestGridPos.Z * 2f);
-					isCurrentlyValidSnap = ValidateSpecificSnapPosition(bestGridPos);
-
 					snapGhost.GlobalPosition = currentSnapWorldPos;
 					snapGhost.Visible = true;
 					ghostMat.AlbedoColor = isCurrentlyValidSnap ? new Color(0, 1, 0, 0.4f) : new Color(1, 0, 0, 0.4f);
@@ -337,10 +336,6 @@ public partial class OrbitCamera : Node3D
 					isCurrentlyValidSnap = false;
 				}
 			}
-		}
-		else if (isHoldingCore)
-		{
-			snapGhost.Visible = false;
 		}
 	}
 
