@@ -1,9 +1,20 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
 public partial class LevelChallenge
 {
+	// A matriz de rotações corrigidas para aplicar nas faces instanciadas
+	private Vector3[] faceRotations = {
+		Vector3.Zero,                                     // 0: Up (Topo)
+		new Vector3((float)Math.PI, 0, 0),                // 1: Down (Baixo)
+		new Vector3(0, 0, -(float)Math.PI / 2),           // 2: Right (Direita)
+		new Vector3(0, 0, (float)Math.PI / 2),            // 3: Left (Esquerda)
+		new Vector3(-(float)Math.PI / 2, 0, 0),           // 4: Forward (-Z)
+		new Vector3((float)Math.PI / 2, 0, 0)             // 5: Back (+Z)
+	};
+
 	private void GenerateProceduralTopology()
 	{
 		RandomNumberGenerator rng = new RandomNumberGenerator();
@@ -15,7 +26,7 @@ public partial class LevelChallenge
 		TargetTopology.Add(Vector3I.Zero);
 		Vector3I[] dirs = { Vector3I.Up, Vector3I.Down, Vector3I.Right, Vector3I.Left, Vector3I.Forward, Vector3I.Back };
 
-		// 1. Geração de GRAFO COMPACTO (Aglomerados em vez de linhas)
+		// GRAFO COMPACTO
 		while (TargetTopology.Count < BlocksToGenerate)
 		{
 			Dictionary<Vector3I, int> holeScores = new Dictionary<Vector3I, int>();
@@ -32,7 +43,6 @@ public partial class LevelChallenge
 				}
 			}
 
-			// Pega nos buracos com mais vizinhos para forçar a criação de blocos compactos (loops)
 			int maxScore = holeScores.Values.Max();
 			var bestHoles = holeScores.Where(k => k.Value == maxScore || rng.Randf() > 0.8f).Select(k => k.Key).ToList();
 			Vector3I chosenHole = bestHoles[rng.RandiRange(0, bestHoles.Count - 1)];
@@ -43,7 +53,7 @@ public partial class LevelChallenge
 		foreach (Vector3I pos in TargetTopology)
 			generatedFaces[pos] = new FaceType[6] { FaceType.Flat, FaceType.Flat, FaceType.Flat, FaceType.Flat, FaceType.Flat, FaceType.Flat };
 
-		// 2. Comprovação Matemática: Garante que TODAS as arestas internas se complementam
+		// CONSTRUÇÃO MATEMÁTICA (Chaves e Fechaduras)
 		List<Vector3I> list = TargetTopology.ToList();
 		for (int i = 0; i < list.Count; i++)
 		{
@@ -52,7 +62,7 @@ public partial class LevelChallenge
 				Vector3I diff = list[j] - list[i];
 				int dist = Mathf.Abs(diff.X) + Mathf.Abs(diff.Y) + Mathf.Abs(diff.Z);
 
-				if (dist == 1) // É um vizinho no Grafo
+				if (dist == 1) 
 				{
 					int shapeType = rng.RandiRange(0, 2);
 					FaceType faceA = FaceType.Flat, faceB = FaceType.Flat;
@@ -75,14 +85,14 @@ public partial class LevelChallenge
 			}
 		}
 
-		// 3. Complexidade Visual: Adiciona conectores aleatórios às paredes exteriores (Topologia não-Flat)
+		// COMPORTAMENTO EXTERIOR ALEATÓRIO
 		foreach (Vector3I pos in TargetTopology)
 		{
 			for (int i = 0; i < 6; i++)
 			{
 				if (generatedFaces[pos][i] == FaceType.Flat)
 				{
-					if (rng.Randf() > 0.4f) // 60% de chance de ter uma face exterior maluca
+					if (rng.Randf() > 0.4f) 
 					{
 						int shapeType = rng.RandiRange(0, 2);
 						bool isExt = rng.RandiRange(0, 1) == 1;
@@ -106,32 +116,46 @@ public partial class LevelChallenge
 
 		foreach (var kvp in generatedFaces)
 		{
-			PuzzlePiece piece;
-			
-			// AGORA SIM: Instancia a cena completa com modelos 3D!
-			if (PieceScene != null) {
-				piece = PieceScene.Instantiate<PuzzlePiece>();
-			} else {
-				piece = new PuzzlePiece();
-				GD.PrintErr("ATENÇÃO: PieceScene não está definida no Inspector! A gerar caixas invisíveis.");
-			}
-
+			// Instancia a classe base do bloco
+			PuzzlePiece piece = new PuzzlePiece();
 			piece.TargetGridPosition = kvp.Key;
+			
+			// Define física
 			piece.Freeze = false;
 			piece.Mass = 1.0f;
 
-			for (int i = 0; i < 6; i++) piece.Faces[i] = kvp.Value[i];
+			// Cria a Hitbox para a física funcionar
+			CollisionShape3D collider = new CollisionShape3D();
+			collider.Shape = new BoxShape3D() { Size = new Vector3(2f, 2f, 2f) };
+			piece.AddChild(collider);
 
+			// MONTAGEM DO MODELO 3D: Pega nos 6 tipos de face matemáticos
+			for (int i = 0; i < 6; i++) 
+			{
+				FaceType currentType = kvp.Value[i];
+				piece.Faces[i] = currentType; // Grava a face na lógica da peça
+
+				// Vai buscar a cena 3D correspondente àquele nome
+				if (faceScenes.ContainsKey(currentType) && faceScenes[currentType] != null)
+				{
+					Node3D faceMesh = faceScenes[currentType].Instantiate<Node3D>();
+					
+					// Roda a malha para apontar para o lado correto (ex: virar a cruz para baixo)
+					faceMesh.Rotation = faceRotations[i];
+					
+					piece.AddChild(faceMesh);
+				}
+			}
+
+			// Adiciona a peça finalizada ao nível
 			AddChild(piece);
 
+			// Espalha pelo mapa
 			piece.GlobalPosition = new Vector3(rng.RandfRange(-15, 15), rng.RandfRange(15, 30), rng.RandfRange(-15, 15));
 			
-			// Desorienta a peça para o jogador ter de descobrir o encaixe
+			// Rotação aleatória travada a eixos de 90 graus
 			float angle = Mathf.Pi / 2f;
 			piece.Rotation = new Vector3(rng.RandiRange(0, 3) * angle, rng.RandiRange(0, 3) * angle, rng.RandiRange(0, 3) * angle);
-
-			// Chama o reconstrutor de visuais da sua peça (se existir)
-			if (piece.HasMethod("GenerateVisualsFromFaces")) piece.Call("GenerateVisualsFromFaces");
 		}
 	}
 

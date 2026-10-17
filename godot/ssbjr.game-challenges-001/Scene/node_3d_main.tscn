@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://cwgiydp3hsxeb" path="res://Scripts/LevelChallenge.cs" id="1_o8dcu"]
 [ext_resource type="Script" uid="uid://cgqrpkvxng6qi" path="res://Scripts/OrbitCamera.cs" id="2_o8dcu"]
-[ext_resource type="PackedScene" uid="uid://cv3y2ack74ehp" path="res://Assets/Faces/Face_Liso.glb" id="2_rcxnc"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_rcxnc"]
 size = Vector3(100, 1, 100)
@@ -17,7 +16,6 @@ transform = Transform3D(1, 0, 0, 0, 1.4869065, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="PuzzleGenerator" type="Node3D" parent="." unique_id=679849283]
 script = ExtResource("1_o8dcu")
-PieceScene = ExtResource("2_rcxnc")
 
 [node name="Floor" type="StaticBody3D" parent="." unique_id=273351490]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -10, 0)
