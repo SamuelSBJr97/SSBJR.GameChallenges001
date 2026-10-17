@@ -114,43 +114,53 @@ public partial class LevelChallenge
 		RandomNumberGenerator rng = new RandomNumberGenerator();
 		rng.Randomize();
 
+		// Vetores de translação exatos para afastar a face do centro e colá-la na borda do cubo (Tamanho 2x2x2)
+		// O raio a partir do centro (0,0,0) para uma face de um cubo de tamanho 2 é 1.0 unidade.
+		Vector3[] faceTranslations = {
+			new Vector3(0, 1.0f, 0),   // 0: Up (Topo)
+			new Vector3(0, -1.0f, 0),  // 1: Down (Baixo)
+			new Vector3(1.0f, 0, 0),   // 2: Right (Direita)
+			new Vector3(-1.0f, 0, 0),  // 3: Left (Esquerda)
+			new Vector3(0, 0, -1.0f),  // 4: Forward (-Z)
+			new Vector3(0, 0, 1.0f)    // 5: Back (+Z)
+		};
+
 		foreach (var kvp in generatedFaces)
 		{
-			// Instancia a classe base do bloco
 			PuzzlePiece piece = new PuzzlePiece();
 			piece.TargetGridPosition = kvp.Key;
 			
-			// Define física
 			piece.Freeze = false;
 			piece.Mass = 1.0f;
 
-			// Cria a Hitbox para a física funcionar
+			// Hitbox física principal do bloco
 			CollisionShape3D collider = new CollisionShape3D();
 			collider.Shape = new BoxShape3D() { Size = new Vector3(2f, 2f, 2f) };
 			piece.AddChild(collider);
 
-			// MONTAGEM DO MODELO 3D: Pega nos 6 tipos de face matemáticos
+			// MONTAGEM DO CUBO 3D: Posiciona cada face na sua respetiva parede exterior
 			for (int i = 0; i < 6; i++) 
 			{
 				FaceType currentType = kvp.Value[i];
-				piece.Faces[i] = currentType; // Grava a face na lógica da peça
+				piece.Faces[i] = currentType; 
 
-				// Vai buscar a cena 3D correspondente àquele nome
 				if (faceScenes.ContainsKey(currentType) && faceScenes[currentType] != null)
 				{
 					Node3D faceMesh = faceScenes[currentType].Instantiate<Node3D>();
 					
-					// Roda a malha para apontar para o lado correto (ex: virar a cruz para baixo)
+					// Aplica a translação para afastar a face do centro para a parede do cubo
+					faceMesh.Position = faceTranslations[i];
+					
+					// Aplica a rotação matemática para orientar a face corretamente para fora
 					faceMesh.Rotation = faceRotations[i];
 					
 					piece.AddChild(faceMesh);
 				}
 			}
 
-			// Adiciona a peça finalizada ao nível
 			AddChild(piece);
 
-			// Espalha pelo mapa
+			// Espalha pelo mapa no ar
 			piece.GlobalPosition = new Vector3(rng.RandfRange(-15, 15), rng.RandfRange(15, 30), rng.RandfRange(-15, 15));
 			
 			// Rotação aleatória travada a eixos de 90 graus
