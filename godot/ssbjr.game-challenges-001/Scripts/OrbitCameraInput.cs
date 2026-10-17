@@ -7,15 +7,12 @@ public partial class OrbitCamera
 	{
 		if (@event is InputEventMouseButton mouseButton)
 		{
-			// Voar com a Câmara (Botão Direito)
 			if (mouseButton.ButtonIndex == MouseButton.Right) 
 				isOrbiting = mouseButton.Pressed;
 			
-			// Zoom (Scroll)
 			else if (mouseButton.Pressed && (mouseButton.ButtonIndex == MouseButton.WheelUp || mouseButton.ButtonIndex == MouseButton.WheelDown))
 				ApplyZoom(mouseButton.ButtonIndex == MouseButton.WheelUp ? -ZoomSpeed : ZoomSpeed);
 			
-			// PEGAR OU LARGAR LIVREMENTE (Botão Esquerdo)
 			else if (mouseButton.ButtonIndex == MouseButton.Left && mouseButton.Pressed)
 			{
 				TrySelectPiece(mouseButton.Position); 
@@ -30,7 +27,6 @@ public partial class OrbitCamera
 			Rotation = rot;
 		}
 
-		// === NOVO INPUT EXCLUSIVO PARA ENCAIXAR ===
 		if (Input.IsActionJustPressed("join_piece"))
 		{
 			if (selectedPiece != null && !isHoldingCore && snapGhost.Visible)
@@ -40,7 +36,6 @@ public partial class OrbitCamera
 			}
 		}
 
-		// Rodar a Peça (Setas)
 		Node3D activeNode = isHoldingCore ? coreGroup : selectedPiece;
 		if (activeNode != null && @event.IsPressed() && !@event.IsEcho())
 		{
@@ -70,6 +65,9 @@ public partial class OrbitCamera
 
 		if (result.Count > 0 && result["collider"].Obj is PuzzlePiece piece)
 		{
+			// DESLIGA A GRAVIDADE: A peça passa a obedecer exclusivamente aos inputs do jogador
+			piece.Freeze = true; 
+
 			if (piece.IsAttachedToCore)
 			{
 				if (isHoldingCore) { DropPieceInPlace(); return; }
@@ -78,6 +76,12 @@ public partial class OrbitCamera
 				isHoldingCore = true;
 				selectedPiece = piece; 
 				targetPiecePosition = coreGroup.GlobalPosition;
+
+				// Garante que todas as peças coladas no núcleo também ignoram a física
+				foreach (Node n in coreGroup.GetChildren())
+				{
+					if (n is PuzzlePiece p) p.Freeze = true;
+				}
 			}
 			else
 			{
@@ -95,7 +99,6 @@ public partial class OrbitCamera
 		}
 	}
 
-	// Larga a peça no mesmo sítio sem a tentar encaixar
 	private void DropPieceInPlace()
 	{
 		if (isHoldingCore)
@@ -117,7 +120,6 @@ public partial class OrbitCamera
 		}
 	}
 
-	// Só é chamado quando carrega na tecla "join_piece" e o fantasma está verde
 	private void ConfirmJoinPiece()
 	{
 		if (selectedPiece != null && isCurrentlyValidSnap)
@@ -125,6 +127,8 @@ public partial class OrbitCamera
 			selectedPiece.GlobalPosition = currentSnapWorldPos;
 			SnapPieceRotationToGrid(selectedPiece);
 
+			// Garante estabilidade física total ao soldar
+			selectedPiece.Freeze = true;
 			selectedPiece.LinearVelocity = Vector3.Zero;
 			selectedPiece.AngularVelocity = Vector3.Zero;
 			selectedPiece.IsAttachedToCore = true;
