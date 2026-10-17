@@ -78,10 +78,14 @@ public partial class OrbitCamera
 				selectedPiece = piece; 
 				targetPiecePosition = coreGroup.GlobalPosition;
 
-				// Garante que todas as peças coladas no núcleo também ignoram a física
+				// Garante que todas as peças coladas no núcleo também ignoram a física e ficam marcadas como selecionadas
 				foreach (Node n in coreGroup.GetChildren())
 				{
-					if (n is PuzzlePiece p) p.Freeze = true;
+					if (n is PuzzlePiece p)
+					{
+						p.Freeze = true;
+						p.SetSelected(true);
+					}
 				}
 			}
 			else
@@ -92,6 +96,7 @@ public partial class OrbitCamera
 				selectedPiece = piece;
 				targetPiecePosition = selectedPiece.GlobalPosition;
 				SnapPieceRotationToGrid(selectedPiece);
+				selectedPiece.SetSelected(true);
 			}
 		}
 		else
@@ -108,6 +113,14 @@ public partial class OrbitCamera
 			coreGroup.GlobalPosition = new Vector3(Mathf.Round(pos.X / 2f) * 2f, Mathf.Round(pos.Y / 2f) * 2f, Mathf.Round(pos.Z / 2f) * 2f);
 			SnapPieceRotationToGrid(coreGroup);
 
+			foreach (Node n in coreGroup.GetChildren())
+			{
+				if (n is PuzzlePiece p)
+				{
+					p.SetSelected(false);
+				}
+			}
+
 			isHoldingCore = false;
 			selectedPiece = null; 
 			snapGhost.Visible = false;
@@ -120,6 +133,7 @@ public partial class OrbitCamera
 			Vector3 pos = selectedPiece.GlobalPosition;
 			selectedPiece.GlobalPosition = new Vector3(Mathf.Round(pos.X / 2f) * 2f, Mathf.Round(pos.Y / 2f) * 2f, Mathf.Round(pos.Z / 2f) * 2f);
 			SnapPieceRotationToGrid(selectedPiece);
+			selectedPiece.SetSelected(false);
 
 			selectedPiece = null;
 			snapGhost.Visible = false;
@@ -174,6 +188,15 @@ public partial class OrbitCamera
 			}
 
 			selectedPiece.Reparent(coreGroup, true);
+
+			// O jogador passa a segurar o núcleo montado
+			foreach (Node n in coreGroup.GetChildren())
+			{
+				if (n is PuzzlePiece p)
+				{
+					p.SetSelected(true);
+				}
+			}
 
 			targetPiecePosition = coreGroup.GlobalPosition;
 			isHoldingCore = true; 

@@ -52,32 +52,32 @@ public partial class PuzzlePiece : RigidBody3D
 		IsSelected = isSelected;
 		
 		// Apenas liga/desliga a caixa amarela. As cores da peça ficam intactas!
-		highlightBox.Visible = isSelected;
+		if (highlightBox != null)
+			highlightBox.Visible = isSelected;
 
 		if (isSelected) Freeze = true; 
-		else if (!IsAttachedToCore) Freeze = false;
 	}
 
 	public override void _PhysicsProcess(double delta)
 	{
-		if (!IsSelected)
+		// Não verifica limites nem respawna se a peça estiver selecionada
+		if (IsSelected) return;
+
+		if (GlobalPosition.Y < -10.0f || Mathf.Abs(GlobalPosition.X) > 50.0f || Mathf.Abs(GlobalPosition.Z) > 50.0f)
 		{
-			if (GlobalPosition.Y < -10.0f || Mathf.Abs(GlobalPosition.X) > 50.0f || Mathf.Abs(GlobalPosition.Z) > 50.0f)
+			if (!IsAttachedToCore)
 			{
-				if (!IsAttachedToCore)
-				{
-					LinearVelocity = Vector3.Zero;
-					AngularVelocity = Vector3.Zero;
-					
-					RandomNumberGenerator rng = new RandomNumberGenerator();
-					rng.Randomize();
-					GlobalPosition = new Vector3(rng.RandfRange(-5, 5), 20.0f, rng.RandfRange(-5, 5));
-				}
-				else
-				{
-					Node parent = GetParent();
-					if (parent is Node3D coreNode) coreNode.GlobalPosition = new Vector3(0, 4.0f, 0);
-				}
+				LinearVelocity = Vector3.Zero;
+				AngularVelocity = Vector3.Zero;
+				
+				RandomNumberGenerator rng = new RandomNumberGenerator();
+				rng.Randomize();
+				GlobalPosition = new Vector3(rng.RandfRange(-5, 5), 20.0f, rng.RandfRange(-5, 5));
+			}
+			else
+			{
+				Node parent = GetParent();
+				if (parent is Node3D coreNode) coreNode.GlobalPosition = new Vector3(0, 4.0f, 0);
 			}
 		}
 	}
