@@ -23,6 +23,8 @@ public partial class OrbitCamera
 
 	private void HandleMovementProcess(double delta)
 	{
+		if (selectedPiece == null && !isHoldingCore) return;
+
 		Vector3 moveInput = Vector3.Zero;
 		if (Input.IsActionPressed("move_right")) moveInput.X += 1;
 		if (Input.IsActionPressed("move_left"))  moveInput.X -= 1;
@@ -83,22 +85,19 @@ public partial class OrbitCamera
 			{
 				Vector3 piecePos = selectedPiece.GlobalPosition;
 				
-				// 1. Mapeamento Sólido (Onde já existem peças coladas)
 				HashSet<Vector3I> occupiedSlots = new HashSet<Vector3I>();
 				foreach (Node node in coreGroup.GetChildren())
 				{
 					if (node is PuzzlePiece p)
 					{
-						Vector3I pGrid = new Vector3I(
+						occupiedSlots.Add(new Vector3I(
 							Mathf.RoundToInt(p.GlobalPosition.X / 2f), 
 							Mathf.RoundToInt(p.GlobalPosition.Y / 2f), 
 							Mathf.RoundToInt(p.GlobalPosition.Z / 2f)
-						);
-						occupiedSlots.Add(pGrid);
+						));
 					}
 				}
 
-				// 2. Extrator de Buracos Válidos (Impede que a lógica avalie espaços ocupados)
 				Vector3I[] dirs = { Vector3I.Up, Vector3I.Down, Vector3I.Right, Vector3I.Left, Vector3I.Forward, Vector3I.Back };
 				HashSet<Vector3I> validHoles = new HashSet<Vector3I>();
 				
@@ -107,15 +106,11 @@ public partial class OrbitCamera
 					foreach (Vector3I d in dirs)
 					{
 						Vector3I hole = occ + d;
-						if (!occupiedSlots.Contains(hole))
-						{
-							validHoles.Add(hole);
-						}
+						if (!occupiedSlots.Contains(hole)) validHoles.Add(hole);
 					}
 				}
 
-				// 3. Procura o buraco vazio mais próximo da peça
-				float minDistance = 5.0f; // Raio aumentado para agarrar de mais longe
+				float minDistance = 4.0f; 
 				bool foundSnap = false;
 				Vector3I bestHole = Vector3I.Zero;
 
@@ -131,22 +126,24 @@ public partial class OrbitCamera
 					}
 				}
 
-				// 4. Se encontrou buraco, valida as faces
 				if (foundSnap)
 				{
 					currentSnapWorldPos = new Vector3(bestHole.X * 2f, bestHole.Y * 2f, bestHole.Z * 2f);
-					isCurrentlyValidSnap = ValidateSpecificSnapPosition(bestHole, occupiedSlots);
+					
+					bool isValid = ValidateSpecificSnapPosition(bestHole, occupiedSlots);
+					isCurrentlyValidSnap = isValid;
 
 					snapGhost.GlobalPosition = currentSnapWorldPos;
 					snapGhost.Visible = true;
-					// Se as topologias forem incompatíveis, mostra caixa Vermelha
-					ghostMat.AlbedoColor = isCurrentlyValidSnap ? new Color(0, 1, 0, 0.4f) : new Color(1, 0, 0, 0.4f);
 
-					// Só atrai magneticamente se a luz for verde e a câmara não estiver a voar
-					if (isCurrentlyValidSnap && !isOrbiting)
+					// Apenas atualiza a cor do feedback visual. Aguarda o input manual para o drop real.
+					if (isValid)
 					{
-						selectedPiece.GlobalPosition = selectedPiece.GlobalPosition.Lerp(currentSnapWorldPos, (float)delta * 20f);
-						targetPiecePosition = selectedPiece.GlobalPosition; 
+						ghostMat.AlbedoColor = new Color(0, 1, 0, 0.4f); // Verde
+					}
+					else
+					{
+						ghostMat.AlbedoColor = new Color(1, 0, 0, 0.5f); // Vermelho
 					}
 				}
 				else
@@ -178,7 +175,6 @@ public partial class OrbitCamera
 		bool isValid = true; 
 		bool touchingAny = false;
 
-		// Medida de segurança extra
 		if (occupiedSlots != null && occupiedSlots.Contains(draggedGridPos)) return false;
 
 		foreach (Node node in coreGroup.GetChildren())
@@ -194,7 +190,7 @@ public partial class OrbitCamera
 				Vector3I diff = draggedGridPos - pGrid;
 				int dist = Mathf.Abs(diff.X) + Mathf.Abs(diff.Y) + Mathf.Abs(diff.Z);
 
-				if (dist == 1) // Se estão a tocar
+				if (dist == 1) 
 				{
 					touchingAny = true;
 					Vector3 globalDirToCore = new Vector3(-diff.X, -diff.Y, -diff.Z);
@@ -203,8 +199,7 @@ public partial class OrbitCamera
 					FaceType myFace = selectedPiece.GetFaceInGlobalDirection(globalDirToCore);
 					FaceType targetFace = p.GetFaceInGlobalDirection(globalDirToDragged);
 
-					// A regra vital: as caras não podem ser lisas (Flat) e a soma tem de dar zero
-					if (myFace == FaceType.Flat || targetFace == FaceType.Flat || (int)myFace + (int)targetFace != 0)
+					if (!AreFacesCompatible(myFace, targetFace)) 
 					{
 						isValid = false; 
 					}
@@ -212,5 +207,21 @@ public partial class OrbitCamera
 			}
 		}
 		return touchingAny && isValid;
+	}
+
+	private bool AreFacesCompatible(FaceType face1, FaceType face2)
+	{
+		if (face1 == FaceType.Flat || face2 == FaceType.Flat) return false;
+
+		if (face1 == FaceType.QuadExt && face2 == FaceType.QuadInt) return true;
+		if (face1 == FaceType.QuadInt && face2 == FaceType.QuadExt) return true;
+		
+		if (face1 == FaceType.CircExt && face2 == FaceType.CircInt) return true;
+		if (face1 == FaceType.CircInt && face2 == FaceType.CircExt) return true;
+		
+		if (face1 == FaceType.CruzExt && face2 == FaceType.CruzInt) return true;
+		if (face1 == FaceType.CruzInt && face2 == FaceType.CruzExt) return true;
+
+		return false;
 	}
 }

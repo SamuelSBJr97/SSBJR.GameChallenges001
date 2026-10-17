@@ -7,11 +7,19 @@ public partial class OrbitCamera
 	{
 		if (@event is InputEventMouseButton mouseButton)
 		{
-			if (mouseButton.ButtonIndex == MouseButton.Right) isOrbiting = mouseButton.Pressed;
+			// Voar com a Câmara (Botão Direito)
+			if (mouseButton.ButtonIndex == MouseButton.Right) 
+				isOrbiting = mouseButton.Pressed;
+			
+			// Zoom (Scroll)
 			else if (mouseButton.Pressed && (mouseButton.ButtonIndex == MouseButton.WheelUp || mouseButton.ButtonIndex == MouseButton.WheelDown))
 				ApplyZoom(mouseButton.ButtonIndex == MouseButton.WheelUp ? -ZoomSpeed : ZoomSpeed);
+			
+			// PEGAR OU LARGAR LIVREMENTE (Botão Esquerdo)
 			else if (mouseButton.ButtonIndex == MouseButton.Left && mouseButton.Pressed)
-				TrySelectPiece(mouseButton.Position);
+			{
+				TrySelectPiece(mouseButton.Position); 
+			}
 		}
 		else if (@event is InputEventMouseMotion mouseMotion && isOrbiting)
 		{
@@ -22,6 +30,17 @@ public partial class OrbitCamera
 			Rotation = rot;
 		}
 
+		// === NOVO INPUT EXCLUSIVO PARA ENCAIXAR ===
+		if (Input.IsActionJustPressed("join_piece"))
+		{
+			if (selectedPiece != null && !isHoldingCore && snapGhost.Visible)
+			{
+				if (isCurrentlyValidSnap) ConfirmJoinPiece();
+				else GD.Print("Encaixe inválido! As faces colidem ou são incompatíveis.");
+			}
+		}
+
+		// Rodar a Peça (Setas)
 		Node3D activeNode = isHoldingCore ? coreGroup : selectedPiece;
 		if (activeNode != null && @event.IsPressed() && !@event.IsEcho())
 		{
@@ -53,34 +72,31 @@ public partial class OrbitCamera
 		{
 			if (piece.IsAttachedToCore)
 			{
-				if (isHoldingCore) { DropOrConfirmPiece(); return; }
-				if (selectedPiece != null && !isHoldingCore) DropOrConfirmPiece();
+				if (isHoldingCore) { DropPieceInPlace(); return; }
+				if (selectedPiece != null && !isHoldingCore) DropPieceInPlace();
 
 				isHoldingCore = true;
 				selectedPiece = piece; 
 				targetPiecePosition = coreGroup.GlobalPosition;
-				
-				foreach (Node n in coreGroup.GetChildren()) 
-					if (n is PuzzlePiece p) p.SetSelected(true);
 			}
 			else
 			{
-				if (selectedPiece == piece) { DropOrConfirmPiece(); return; }
-				if (selectedPiece != null || isHoldingCore) DropOrConfirmPiece();
+				if (selectedPiece == piece) { DropPieceInPlace(); return; }
+				if (selectedPiece != null || isHoldingCore) DropPieceInPlace();
 
 				selectedPiece = piece;
-				selectedPiece.SetSelected(true);
 				targetPiecePosition = selectedPiece.GlobalPosition;
 				SnapPieceRotationToGrid(selectedPiece);
 			}
 		}
 		else
 		{
-			if (selectedPiece != null || isHoldingCore) DropOrConfirmPiece();
+			if (selectedPiece != null || isHoldingCore) DropPieceInPlace();
 		}
 	}
 
-	private void DropOrConfirmPiece()
+	// Larga a peça no mesmo sítio sem a tentar encaixar
+	private void DropPieceInPlace()
 	{
 		if (isHoldingCore)
 		{
@@ -88,9 +104,6 @@ public partial class OrbitCamera
 			coreGroup.GlobalPosition = new Vector3(Mathf.Round(pos.X / 2f) * 2f, Mathf.Round(pos.Y / 2f) * 2f, Mathf.Round(pos.Z / 2f) * 2f);
 			SnapPieceRotationToGrid(coreGroup);
 
-			foreach (Node n in coreGroup.GetChildren()) 
-				if (n is PuzzlePiece p) p.SetSelected(false);
-			
 			isHoldingCore = false;
 			selectedPiece = null; 
 			snapGhost.Visible = false;
@@ -99,26 +112,32 @@ public partial class OrbitCamera
 
 		if (selectedPiece != null)
 		{
-			if (isCurrentlyValidSnap)
+			selectedPiece = null;
+			snapGhost.Visible = false;
+		}
+	}
+
+	// Só é chamado quando carrega na tecla "join_piece" e o fantasma está verde
+	private void ConfirmJoinPiece()
+	{
+		if (selectedPiece != null && isCurrentlyValidSnap)
+		{
+			selectedPiece.GlobalPosition = currentSnapWorldPos;
+			SnapPieceRotationToGrid(selectedPiece);
+
+			selectedPiece.LinearVelocity = Vector3.Zero;
+			selectedPiece.AngularVelocity = Vector3.Zero;
+			selectedPiece.IsAttachedToCore = true;
+			
+			if (coreGroup.GetChildCount() == 0)
 			{
-				selectedPiece.GlobalPosition = currentSnapWorldPos;
-				SnapPieceRotationToGrid(selectedPiece);
-
-				selectedPiece.LinearVelocity = Vector3.Zero;
-				selectedPiece.AngularVelocity = Vector3.Zero;
-				selectedPiece.IsAttachedToCore = true;
-				
-				if (coreGroup.GetChildCount() == 0)
-				{
-					coreGroup.GlobalPosition = currentSnapWorldPos;
-					coreGroup.Rotation = Vector3.Zero;
-				}
-
-				selectedPiece.Reparent(coreGroup, true);
+				coreGroup.GlobalPosition = currentSnapWorldPos;
+				coreGroup.Rotation = Vector3.Zero;
 			}
 
-			selectedPiece.SetSelected(false);
-			selectedPiece = null;
+			selectedPiece.Reparent(coreGroup, true);
+
+			isHoldingCore = true; 
 			snapGhost.Visible = false;
 		}
 	}
