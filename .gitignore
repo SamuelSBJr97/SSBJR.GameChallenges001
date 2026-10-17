@@ -1,0 +1,81 @@
+### ==========================================
+
+### GODOT ENGINE
+
+### ==========================================
+
+### Pasta interna de cache e indexação (Godot 4.x)
+
+.godot/ 
+
+### Pasta de importações antigas (Godot 3.x, mantenha se for o caso)
+
+.import/ 
+
+### Arquivos de exportação locais e credenciais (sensível)
+
+export.cfg
+export_credentials.cfg 
+
+### Arquivos temporários e logs da engine
+
+*.tmp
+godot.log 
+
+### Traduções binárias geradas automaticamente (devem ser recriadas a partir dos arquivos CSV originais)
+
+*.translation 
+
+### Se estiver usando Godot com C# (Mono / .NET)
+
+.mono/
+data_*/
+mono_crash.*.json
+*.suo
+*.ntvsca*
+*.njsproj
+*.sln
+*.csproj 
+
+### ==========================================
+
+### BLENDER
+
+### ==========================================
+
+### Arquivos de salvamento automático e backups gerados pelo Blender (.blend1, .blend2, etc.)
+
+*.blend[0-9]
+*.blend+ 
+
+### Arquivos de recuperação automática do Blender em caso de crash
+
+.blend_crash*
+quit.blend 
+
+### Cache de simulações físicas, fluidos, fumaça e fita de vídeo (gerados na pasta do projeto)
+
+/blendcache_*/ 
+
+### ==========================================
+
+### SISTEMA OPERACIONAL E IDES
+
+### ==========================================
+
+### Windows
+
+Thumbs.db
+Desktop.ini 
+
+### macOS
+
+.DS_Store 
+
+### VS Code / JetBrains / Visual Studio
+
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.sln.docstates
