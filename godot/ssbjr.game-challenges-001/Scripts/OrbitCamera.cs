@@ -16,7 +16,6 @@ public partial class OrbitCamera : Node3D
 	private Node3D coreGroup;       
 	private bool isHoldingCore = false; 
 
-	// FEEDBACK VISUAL
 	private MeshInstance3D snapGhost;
 	private StandardMaterial3D ghostMat;
 
@@ -25,31 +24,26 @@ public partial class OrbitCamera : Node3D
 	private Vector3 targetPiecePosition;
 	private Vector3 targetCameraPosition;
 
-	// INTERFACE DE USUÁRIO (UI)
-	private Control uiContainer;
+	// INTERFACE DE USUÁRIO (Minimapa 3D)
 	private Label helpLabel;
-	
-	// As 6 texturas na tela (0:Up, 1:Down, 2:Right, 3:Left, 4:Forward, 5:Back)
-	private TextureRect[] faceIcons = new TextureRect[6]; 
-	
-	// Texturas carregadas
-	private Texture2D texFlat, texQuadExt, texQuadInt, texCircExt, texCircInt, texCruzExt, texCruzInt;
+	private SubViewport minimapViewport;
+	private Camera3D minimapCamera;
+	private Node3D minimapRoot;
 
 	public override void _Ready()
 	{
 		camera = GetNode<Camera3D>("Camera3D");
 		targetCameraPosition = GlobalPosition; 
 		
-		// 1. Cubo Holográfico Aumentado e com Raio-X (NoDepthTest)
 		snapGhost = new MeshInstance3D();
 		BoxMesh box = new BoxMesh();
-		box.Size = new Vector3(2.1f, 2.1f, 2.1f); // 0.1 maior que a peça para a sobrepor visualmente
+		box.Size = new Vector3(2.1f, 2.1f, 2.1f);
 		snapGhost.Mesh = box;
 
 		ghostMat = new StandardMaterial3D();
 		ghostMat.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
 		ghostMat.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
-		ghostMat.NoDepthTest = true; // Garante que o cubo fantasma é visto ATRAVÉS da peça
+		ghostMat.NoDepthTest = true; 
 		snapGhost.MaterialOverride = ghostMat;
 		snapGhost.TopLevel = true;
 		snapGhost.Visible = false;
@@ -58,131 +52,121 @@ public partial class OrbitCamera : Node3D
 		coreGroup = new Node3D();
 		coreGroup.Name = "CoreAssembly";
 		GetParent().CallDeferred(Node.MethodName.AddChild, coreGroup);
-		
-		LoadTextures();
-		BuildUI();
-	}
-	
-	private void LoadTextures()
-	{
-		// Certifique-se que o caminho confere com onde guardou os PNGs no Godot
-		texFlat = GD.Load<Texture2D>("res://Assets/Icons/Flat.png");
-		texQuadExt = GD.Load<Texture2D>("res://Assets/Icons/QuadExt.png");
-		texQuadInt = GD.Load<Texture2D>("res://Assets/Icons/QuadInt.png");
-		texCircExt = GD.Load<Texture2D>("res://Assets/Icons/CircExt.png");
-		texCircInt = GD.Load<Texture2D>("res://Assets/Icons/CircInt.png");
-		texCruzExt = GD.Load<Texture2D>("res://Assets/Icons/CruzExt.png");
-		texCruzInt = GD.Load<Texture2D>("res://Assets/Icons/CruzInt.png");
+
+		Build3DMinimapUI();
 	}
 
-	private void BuildUI()
+	private void Build3DMinimapUI()
 	{
 		CanvasLayer canvas = new CanvasLayer();
 		AddChild(canvas);
 
-		uiContainer = new Control();
-		uiContainer.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
-		canvas.AddChild(uiContainer);
-
-		// Fundo do minimapa
-		ColorRect bg = new ColorRect();
-		bg.Color = new Color(0, 0, 0, 0.6f);
-		bg.Size = new Vector2(300, 240);
-		bg.Position = new Vector2(20, 20);
-		uiContainer.AddChild(bg);
-
 		helpLabel = new Label();
-		helpLabel.Position = new Vector2(30, 30);
-		helpLabel.Text = "Selecione uma peça...";
-		helpLabel.LabelSettings = new LabelSettings() { FontSize = 14, FontColor = Colors.White };
-		uiContainer.AddChild(helpLabel);
+		helpLabel.SetAnchorsPreset(Control.LayoutPreset.TopLeft);
+		helpLabel.Position = new Vector2(20, 20);
+		helpLabel.LabelSettings = new LabelSettings() { FontSize = 16, FontColor = Colors.White };
+		canvas.AddChild(helpLabel);
 
-		// Configuração do "Cubo Desdobrado" usando coordenadas 2D (Tamanho do ícone: 50x50)
-		float iconSize = 50f;
-		float padding = 5f;
-		float startX = 30f;
-		float startY = 60f;
+		// Contentor da Miniatura 3D (Canto Superior Direito)
+		SubViewportContainer container = new SubViewportContainer();
+		container.SetAnchorsPreset(Control.LayoutPreset.TopRight);
+		container.Position = new Vector2(-280, 20); // 20px de margem
+		container.Size = new Vector2(250, 250);
+		canvas.AddChild(container);
 
-		// Posições no mapa: [Left] [Forward] [Right] [Back]
-		//                          [  Up   ]
-		//                          [ Down  ]
-		Vector2 posUp = new Vector2(startX + iconSize + padding, startY);
-		Vector2 posLeft = new Vector2(startX, startY + iconSize + padding);
-		Vector2 posForward = new Vector2(startX + iconSize + padding, startY + iconSize + padding);
-		Vector2 posRight = new Vector2(startX + (iconSize + padding) * 2, startY + iconSize + padding);
-		Vector2 posBack = new Vector2(startX + (iconSize + padding) * 3, startY + iconSize + padding);
-		Vector2 posDown = new Vector2(startX + iconSize + padding, startY + (iconSize + padding) * 2);
+		// Fundo escuro para a miniatura
+		ColorRect bg = new ColorRect();
+		bg.Color = new Color(0, 0, 0, 0.5f);
+		bg.Size = new Vector2(250, 250);
+		container.AddChild(bg);
 
-		Vector2[] positions = { posUp, posDown, posRight, posLeft, posForward, posBack };
+		// Cria o Mundo 3D isolado para a UI
+		minimapViewport = new SubViewport();
+		minimapViewport.TransparentBg = true;
+		minimapViewport.Size = new Vector2I(250, 250);
+		minimapViewport.OwnWorld3D = true; // Isola as luzes e sombras do minimapa do resto do jogo
+		container.AddChild(minimapViewport);
 
-		for (int i = 0; i < 6; i++)
-		{
-			ColorRect slotBg = new ColorRect(); // Fundo cinza para cada face
-			slotBg.Color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
-			slotBg.Size = new Vector2(iconSize, iconSize);
-			slotBg.Position = positions[i];
-			uiContainer.AddChild(slotBg);
+		minimapRoot = new Node3D();
+		minimapViewport.AddChild(minimapRoot);
 
-			faceIcons[i] = new TextureRect();
-			faceIcons[i].ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
-			faceIcons[i].Size = new Vector2(iconSize, iconSize);
-			faceIcons[i].Position = positions[i];
-			uiContainer.AddChild(faceIcons[i]);
-		}
+		minimapCamera = new Camera3D();
+		minimapViewport.AddChild(minimapCamera);
+
+		// Luzes exclusivas do minimapa
+		DirectionalLight3D light1 = new DirectionalLight3D();
+		light1.Position = new Vector3(5, 5, 5);
+		light1.LookAt(Vector3.Zero);
+		minimapViewport.AddChild(light1);
+
+		DirectionalLight3D light2 = new DirectionalLight3D();
+		light2.Position = new Vector3(-5, 5, -5);
+		light2.LookAt(Vector3.Zero);
+		minimapViewport.AddChild(light2);
 	}
-	
-	private void UpdateUIPanel()
+
+	// O Motor de Clonagem: Copia as malhas 3D para o minimapa
+	private void RefreshMinimap()
 	{
-		if (selectedPiece == null)
-		{
-			helpLabel.Text = "Clique: Selecionar  |  Dir: Câmera";
-			foreach (var icon in faceIcons) icon.Texture = null; 
-			return;
-		}
+		// Limpa a miniatura antiga
+		foreach (Node n in minimapRoot.GetChildren()) n.QueueFree();
 
-		helpLabel.Text = isHoldingCore ? "Movendo Bloco Inteiro." : "Rotacionar: Setas e PgUp/PgDn";
+		Node3D activeNode = isHoldingCore ? coreGroup : selectedPiece;
+		if (activeNode == null) return;
 
-		// Vetores achatados da câmara para o minimapa
-		Vector3 camForward = -camera.GlobalTransform.Basis.Z.Normalized();
-		Vector3 camRight = camera.GlobalTransform.Basis.X.Normalized();
-		camForward.Y = 0; camForward = camForward.Normalized();
-		camRight.Y = 0; camRight = camRight.Normalized();
-
-		// O que aponta PARA a câmara é o inverso da frente da câmara
-		Vector3 faceTowardsCamera = -camForward;
-		Vector3 faceAwayFromCamera = camForward;
-
-		// faceIcons: 0:Up, 1:Down, 2:Right, 3:Left, 4:Front(Camera), 5:Back
-		faceIcons[0].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(Vector3.Up));
-		faceIcons[1].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(Vector3.Down));
-		
-		// Relativo à câmara
-		faceIcons[2].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(camRight));
-		faceIcons[3].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(-camRight));
-		faceIcons[4].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(faceTowardsCamera)); // Bloco central inferior
-		faceIcons[5].Texture = GetFaceTexture(selectedPiece.GetFaceInGlobalDirection(faceAwayFromCamera));
+		// Clona a topologia atual preservando as posições relativas
+		Transform3D invTransform = activeNode.GlobalTransform.AffineInverse();
+		CloneMeshes(activeNode, minimapRoot, invTransform);
 	}
 
-	private Texture2D GetFaceTexture(FaceType type)
+	private void CloneMeshes(Node current, Node targetParent, Transform3D invTransform)
 	{
-		switch (type)
+		if (current is MeshInstance3D meshInst)
 		{
-			case FaceType.QuadExt: return texQuadExt;
-			case FaceType.QuadInt: return texQuadInt;
-			case FaceType.CircExt: return texCircExt;
-			case FaceType.CircInt: return texCircInt;
-			case FaceType.CruzExt: return texCruzExt;
-			case FaceType.CruzInt: return texCruzInt;
-			default: return texFlat;
+			MeshInstance3D clone = new MeshInstance3D();
+			clone.Mesh = meshInst.Mesh;
+			
+			// Mantém as cores originais da peça
+			if (meshInst.MaterialOverride != null) clone.MaterialOverride = meshInst.MaterialOverride;
+			for (int i = 0; i < meshInst.GetSurfaceOverrideMaterialCount(); i++)
+				clone.SetSurfaceOverrideMaterial(i, meshInst.GetSurfaceOverrideMaterial(i));
+
+			clone.Transform = invTransform * meshInst.GlobalTransform;
+			targetParent.AddChild(clone);
 		}
+
+		foreach (Node child in current.GetChildren())
+			CloneMeshes(child, targetParent, invTransform);
 	}
-	
+
 	public override void _Process(double delta)
 	{
-		// Atualiza o painel da UI a cada frame
-		UpdateUIPanel();
+		Node3D activeNode = isHoldingCore ? coreGroup : selectedPiece;
+
+		if (activeNode == null)
+		{
+			helpLabel.Text = "=== CONTROLES ===\nClique Esq: Selecionar\nDir: Voar Câmera";
+			minimapRoot.Visible = false;
+		}
+		else
+		{
+			helpLabel.Text = isHoldingCore ? "=== MOVENDO BLOCO (Clique para fixar) ===" : "=== ROTACIONAR (Setas / PgUp / PgDn) ===";
+			minimapRoot.Visible = true;
+
+			// Sincroniza a Rotação 3D do minimapa com a peça
+			minimapRoot.Basis = activeNode.GlobalTransform.Basis;
+
+			// Coloca a câmara do minimapa no mesmo ângulo da câmara principal para a perspetiva ser idêntica
+			Vector3 dirToCam = (camera.GlobalPosition - activeNode.GlobalPosition).Normalized();
+			
+			// Afasta a câmara dependendo do tamanho do grupo (para não cortar as peças)
+			float zoomDist = isHoldingCore ? 8.0f + (coreGroup.GetChildCount() * 1.5f) : 6.0f;
+			
+			minimapCamera.Position = dirToCam * zoomDist;
+			minimapCamera.LookAt(Vector3.Zero);
+		}
 	}
-	
+
 	public override void _UnhandledInput(InputEvent @event)
 	{
 		if (@event is InputEventMouseButton mouseButton)
@@ -265,7 +249,6 @@ public partial class OrbitCamera : Node3D
 			}
 		}
 
-		// 2. LÓGICA DE SNAPPING DINÂMICO
 		if (selectedPiece != null && !isHoldingCore)
 		{
 			if (coreGroup.GetChildCount() == 0)
@@ -283,11 +266,10 @@ public partial class OrbitCamera : Node3D
 			{
 				Vector3 piecePos = selectedPiece.GlobalPosition;
 				Vector3 bestWorldPos = Vector3.Zero;
-				float minDistance = 4.0f; // Distância máxima de atração
+				float minDistance = 4.0f;
 				isCurrentlyValidSnap = false;
 				bool foundSnap = false;
 
-				// Percorre TODAS as peças do Core e verifica as 6 posições adjacentes a cada uma delas no MUNDO
 				Vector3[] dirs = { Vector3.Up * 2f, Vector3.Down * 2f, Vector3.Right * 2f, Vector3.Left * 2f, Vector3.Forward * 2f, Vector3.Back * 2f };
 				
 				foreach (Node node in coreGroup.GetChildren())
@@ -301,13 +283,9 @@ public partial class OrbitCamera : Node3D
 							
 							if (dist < minDistance)
 							{
-								// Transforma para Grid para usar a validação
 								Vector3I checkGrid = new Vector3I(Mathf.RoundToInt(checkPos.X/2f), Mathf.RoundToInt(checkPos.Y/2f), Mathf.RoundToInt(checkPos.Z/2f));
-								
-								// Valida se é um espaço livre e válido
 								bool isValid = ValidateSpecificSnapPosition(checkGrid);
 								
-								// Quer seja vermelho ou verde, atraímos a luz se for o mais próximo!
 								minDistance = dist;
 								bestWorldPos = checkPos;
 								isCurrentlyValidSnap = isValid;
@@ -337,6 +315,10 @@ public partial class OrbitCamera : Node3D
 				}
 			}
 		}
+		else if (isHoldingCore)
+		{
+			snapGhost.Visible = false;
+		}
 	}
 
 	private void TrySelectPiece(Vector2 mousePos)
@@ -353,11 +335,13 @@ public partial class OrbitCamera : Node3D
 				if (selectedPiece != null && !isHoldingCore) DropOrConfirmPiece();
 
 				isHoldingCore = true;
-				selectedPiece = piece; // CORREÇÃO: Guarda a peça em que clicamos para o minimapa!
+				selectedPiece = piece; 
 				targetPiecePosition = coreGroup.GlobalPosition;
 				
 				foreach (Node n in coreGroup.GetChildren()) 
 					if (n is PuzzlePiece p) p.SetSelected(true);
+				
+				RefreshMinimap(); // Atualiza a miniatura 3D para o Grupo
 			}
 			else
 			{
@@ -368,6 +352,8 @@ public partial class OrbitCamera : Node3D
 				selectedPiece.SetSelected(true);
 				targetPiecePosition = selectedPiece.GlobalPosition;
 				SnapPieceRotationToGrid(selectedPiece);
+				
+				RefreshMinimap(); // Atualiza a miniatura 3D para a Peça individual
 			}
 		}
 		else
@@ -388,8 +374,9 @@ public partial class OrbitCamera : Node3D
 				if (n is PuzzlePiece p) p.SetSelected(false);
 			
 			isHoldingCore = false;
-			selectedPiece = null; // CORREÇÃO: Limpa a referência da UI ao largar o grupo
+			selectedPiece = null; 
 			snapGhost.Visible = false;
+			RefreshMinimap(); // Limpa a miniatura
 			return;
 		}
 
@@ -416,11 +403,10 @@ public partial class OrbitCamera : Node3D
 			selectedPiece.SetSelected(false);
 			selectedPiece = null;
 			snapGhost.Visible = false;
+			RefreshMinimap(); // Limpa a miniatura
 		}
 	}
 
-	// 3. Ortogonalização Absoluta: Mesmo que a física atire a peça de pernas para o ar,
-	// esta função arredonda rigorosamente os ângulos globais para múltiplos perfeitos de 90 graus.
 	private void SnapPieceRotationToGrid(Node3D node)
 	{
 		Vector3 euler = node.GlobalRotation;
@@ -441,12 +427,7 @@ public partial class OrbitCamera : Node3D
 		{
 			if (node is PuzzlePiece p)
 			{
-				Vector3I pGrid = new Vector3I(
-					Mathf.RoundToInt(p.GlobalPosition.X / 2f),
-					Mathf.RoundToInt(p.GlobalPosition.Y / 2f),
-					Mathf.RoundToInt(p.GlobalPosition.Z / 2f)
-				);
-
+				Vector3I pGrid = new Vector3I(Mathf.RoundToInt(p.GlobalPosition.X / 2f), Mathf.RoundToInt(p.GlobalPosition.Y / 2f), Mathf.RoundToInt(p.GlobalPosition.Z / 2f));
 				Vector3I diff = draggedGridPos - pGrid;
 				int dist = Mathf.Abs(diff.X) + Mathf.Abs(diff.Y) + Mathf.Abs(diff.Z);
 
