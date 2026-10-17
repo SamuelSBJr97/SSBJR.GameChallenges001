@@ -165,7 +165,7 @@ public partial class OrbitCamera
 			return;
 		}
 
-		string joinKey = InputMap.HasAction("join_piece") ? "[join_piece]" : "Ação não configurada";
+		string joinKey = InputMap.HasAction("join_piece") ? "[join_piece / Botão Meio]" : "Ação não configurada";
 
 		helpLabel.Text = isHoldingCore 
 			? "TOPOLOGIA ATUAL (GRUPO)\n(Clique Esq: Largar)" 
@@ -176,11 +176,22 @@ public partial class OrbitCamera
 		if (isHoldingCore)
 		{
 			foreach (Node n in coreGroup.GetChildren())
-				if (n is PuzzlePiece p) currentPieces.Add((p.GlobalPosition, p));
+			{
+				if (n is PuzzlePiece p)
+				{
+					Vector3 rel = p.GlobalPosition - coreGroup.GlobalPosition;
+					Vector3 gridRel = new Vector3(
+						Mathf.Round(rel.X / 2f) * 2f,
+						Mathf.Round(rel.Y / 2f) * 2f,
+						Mathf.Round(rel.Z / 2f) * 2f
+					);
+					currentPieces.Add((gridRel, p));
+				}
+			}
 		}
 		else
 		{
-			currentPieces.Add((selectedPiece.GlobalPosition, selectedPiece));
+			currentPieces.Add((Vector3.Zero, selectedPiece));
 		}
 
 		DrawLayoutOnCanvas(mapCanvas, currentPieces, mainIconPool, ref activeMainIcons);
@@ -203,10 +214,38 @@ public partial class OrbitCamera
 			}
 
 			List<(Vector3 pos, PuzzlePiece piece)> previewPieces = new List<(Vector3, PuzzlePiece)>();
-			foreach (Node n in coreGroup.GetChildren())
+			
+			if (snapTargetPieces != null && snapTargetPieces.Count > 0)
 			{
-				if (n is PuzzlePiece p) previewPieces.Add((p.GlobalPosition, p));
+				foreach (PuzzlePiece p in snapTargetPieces)
+				{
+					if (GodotObject.IsInstanceValid(p))
+					{
+						Vector3 targetGridPos = new Vector3(
+							Mathf.RoundToInt(p.GlobalPosition.X / 2f) * 2f,
+							Mathf.RoundToInt(p.GlobalPosition.Y / 2f) * 2f,
+							Mathf.RoundToInt(p.GlobalPosition.Z / 2f) * 2f
+						);
+						previewPieces.Add((targetGridPos, p));
+					}
+				}
 			}
+			else if (coreGroup.GetChildCount() > 0)
+			{
+				foreach (Node n in coreGroup.GetChildren())
+				{
+					if (n is PuzzlePiece p)
+					{
+						Vector3 targetGridPos = new Vector3(
+							Mathf.RoundToInt(p.GlobalPosition.X / 2f) * 2f,
+							Mathf.RoundToInt(p.GlobalPosition.Y / 2f) * 2f,
+							Mathf.RoundToInt(p.GlobalPosition.Z / 2f) * 2f
+						);
+						previewPieces.Add((targetGridPos, p));
+					}
+				}
+			}
+
 			// Simula a posição da peça na localização do fantasma para mostrar como a nova topologia ficará
 			previewPieces.Add((currentSnapWorldPos, selectedPiece));
 

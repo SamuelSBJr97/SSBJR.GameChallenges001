@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 
 public partial class OrbitCamera
 {
@@ -110,13 +111,19 @@ public partial class OrbitCamera
 			isHoldingCore = false;
 			selectedPiece = null; 
 			snapGhost.Visible = false;
+			snapTargetPieces.Clear();
 			return;
 		}
 
 		if (selectedPiece != null)
 		{
+			Vector3 pos = selectedPiece.GlobalPosition;
+			selectedPiece.GlobalPosition = new Vector3(Mathf.Round(pos.X / 2f) * 2f, Mathf.Round(pos.Y / 2f) * 2f, Mathf.Round(pos.Z / 2f) * 2f);
+			SnapPieceRotationToGrid(selectedPiece);
+
 			selectedPiece = null;
 			snapGhost.Visible = false;
+			snapTargetPieces.Clear();
 		}
 	}
 
@@ -124,6 +131,33 @@ public partial class OrbitCamera
 	{
 		if (selectedPiece != null && isCurrentlyValidSnap)
 		{
+			// Anexa ao coreGroup qualquer peça alvo solta que esteja a ser conectada
+			foreach (PuzzlePiece target in snapTargetPieces)
+			{
+				if (GodotObject.IsInstanceValid(target) && !target.IsAttachedToCore)
+				{
+					Vector3 targetGridPos = new Vector3(
+						Mathf.Round(target.GlobalPosition.X / 2f) * 2f,
+						Mathf.Round(target.GlobalPosition.Y / 2f) * 2f,
+						Mathf.Round(target.GlobalPosition.Z / 2f) * 2f
+					);
+					target.GlobalPosition = targetGridPos;
+					SnapPieceRotationToGrid(target);
+					target.Freeze = true;
+					target.LinearVelocity = Vector3.Zero;
+					target.AngularVelocity = Vector3.Zero;
+					target.IsAttachedToCore = true;
+
+					if (coreGroup.GetChildCount() == 0)
+					{
+						coreGroup.GlobalPosition = targetGridPos;
+						coreGroup.Rotation = Vector3.Zero;
+					}
+
+					target.Reparent(coreGroup, true);
+				}
+			}
+
 			selectedPiece.GlobalPosition = currentSnapWorldPos;
 			SnapPieceRotationToGrid(selectedPiece);
 
@@ -141,8 +175,10 @@ public partial class OrbitCamera
 
 			selectedPiece.Reparent(coreGroup, true);
 
+			targetPiecePosition = coreGroup.GlobalPosition;
 			isHoldingCore = true; 
 			snapGhost.Visible = false;
+			snapTargetPieces.Clear();
 		}
 	}
 

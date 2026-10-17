@@ -68,94 +68,130 @@ public partial class OrbitCamera
 
 	private void HandleSnappingProcess(double delta)
 	{
-		if (selectedPiece != null && !isHoldingCore)
+		if (selectedPiece == null || isHoldingCore)
 		{
-			if (coreGroup.GetChildCount() == 0)
+			snapGhost.Visible = false;
+			isCurrentlyValidSnap = false;
+			snapTargetPieces.Clear();
+			return;
+		}
+
+		Vector3 piecePos = selectedPiece.GlobalPosition;
+
+		// 1. Varrer todas as outras peças no cenário (soltas ou no coreGroup)
+		var pieceNodes = GetTree().GetNodesInGroup("PuzzlePiece");
+		Dictionary<Vector3I, PuzzlePiece> occupiedSlots = new Dictionary<Vector3I, PuzzlePiece>();
+
+		foreach (Node node in pieceNodes)
+		{
+			if (node is PuzzlePiece p && GodotObject.IsInstanceValid(p) && p != selectedPiece)
 			{
-				Vector3 pos = selectedPiece.GlobalPosition;
-				Vector3I gridPos = new Vector3I(Mathf.RoundToInt(pos.X / 2f), Mathf.RoundToInt(pos.Y / 2f), Mathf.RoundToInt(pos.Z / 2f));
-				currentSnapWorldPos = new Vector3(gridPos.X * 2f, gridPos.Y * 2f, gridPos.Z * 2f);
-				
-				snapGhost.GlobalPosition = currentSnapWorldPos;
-				snapGhost.Visible = true;
-				ghostMat.AlbedoColor = new Color(0, 1, 0, 0.4f);
-				isCurrentlyValidSnap = true;
+				Vector3I gridPos = new Vector3I(
+					Mathf.RoundToInt(p.GlobalPosition.X / 2f),
+					Mathf.RoundToInt(p.GlobalPosition.Y / 2f),
+					Mathf.RoundToInt(p.GlobalPosition.Z / 2f)
+				);
+				occupiedSlots[gridPos] = p;
 			}
-			else
+		}
+
+		if (occupiedSlots.Count == 0)
+		{
+			snapGhost.Visible = false;
+			isCurrentlyValidSnap = false;
+			snapTargetPieces.Clear();
+			return;
+		}
+
+		// 2. Coletar buracos adjacentes a todas as peças ocupadas
+		Vector3I[] dirs = { Vector3I.Up, Vector3I.Down, Vector3I.Right, Vector3I.Left, Vector3I.Forward, Vector3I.Back };
+		HashSet<Vector3I> validHoles = new HashSet<Vector3I>();
+
+		foreach (Vector3I occ in occupiedSlots.Keys)
+		{
+			foreach (Vector3I d in dirs)
 			{
-				Vector3 piecePos = selectedPiece.GlobalPosition;
-				
-				HashSet<Vector3I> occupiedSlots = new HashSet<Vector3I>();
-				foreach (Node node in coreGroup.GetChildren())
+				Vector3I hole = occ + d;
+				if (!occupiedSlots.ContainsKey(hole))
 				{
-					if (node is PuzzlePiece p)
-					{
-						occupiedSlots.Add(new Vector3I(
-							Mathf.RoundToInt(p.GlobalPosition.X / 2f), 
-							Mathf.RoundToInt(p.GlobalPosition.Y / 2f), 
-							Mathf.RoundToInt(p.GlobalPosition.Z / 2f)
-						));
-					}
-				}
-
-				Vector3I[] dirs = { Vector3I.Up, Vector3I.Down, Vector3I.Right, Vector3I.Left, Vector3I.Forward, Vector3I.Back };
-				HashSet<Vector3I> validHoles = new HashSet<Vector3I>();
-				
-				foreach (Vector3I occ in occupiedSlots)
-				{
-					foreach (Vector3I d in dirs)
-					{
-						Vector3I hole = occ + d;
-						if (!occupiedSlots.Contains(hole)) validHoles.Add(hole);
-					}
-				}
-
-				float minDistance = 4.0f; 
-				bool foundSnap = false;
-				Vector3I bestHole = Vector3I.Zero;
-
-				foreach (Vector3I hole in validHoles)
-				{
-					Vector3 holeWorldPos = new Vector3(hole.X * 2f, hole.Y * 2f, hole.Z * 2f);
-					float dist = piecePos.DistanceTo(holeWorldPos);
-					if (dist < minDistance)
-					{
-						minDistance = dist;
-						bestHole = hole;
-						foundSnap = true;
-					}
-				}
-
-				if (foundSnap)
-				{
-					currentSnapWorldPos = new Vector3(bestHole.X * 2f, bestHole.Y * 2f, bestHole.Z * 2f);
-					
-					bool isValid = ValidateSpecificSnapPosition(bestHole, occupiedSlots);
-					isCurrentlyValidSnap = isValid;
-
-					snapGhost.GlobalPosition = currentSnapWorldPos;
-					snapGhost.Visible = true;
-
-					// Apenas atualiza a cor do feedback visual. Aguarda o input manual para o drop real.
-					if (isValid)
-					{
-						ghostMat.AlbedoColor = new Color(0, 1, 0, 0.4f); // Verde
-					}
-					else
-					{
-						ghostMat.AlbedoColor = new Color(1, 0, 0, 0.5f); // Vermelho
-					}
-				}
-				else
-				{
-					snapGhost.Visible = false;
-					isCurrentlyValidSnap = false;
+					validHoles.Add(hole);
 				}
 			}
 		}
-		else if (isHoldingCore)
+
+		// 3. Encontrar o buraco mais próximo com distância < 4.0
+		float minDistance = 4.0f;
+		bool foundSnap = false;
+		Vector3I bestHole = Vector3I.Zero;
+
+		foreach (Vector3I hole in validHoles)
+		{
+			Vector3 holeWorldPos = new Vector3(hole.X * 2f, hole.Y * 2f, hole.Z * 2f);
+			float dist = piecePos.DistanceTo(holeWorldPos);
+			if (dist < minDistance)
+			{
+				minDistance = dist;
+				bestHole = hole;
+				foundSnap = true;
+			}
+		}
+
+		if (foundSnap)
+		{
+			currentSnapWorldPos = new Vector3(bestHole.X * 2f, bestHole.Y * 2f, bestHole.Z * 2f);
+			snapGhost.GlobalPosition = currentSnapWorldPos;
+			snapGhost.GlobalRotation = selectedPiece.GlobalRotation;
+			snapGhost.Visible = true;
+
+			// Coletar peças vizinhas a esse buraco específico
+			List<PuzzlePiece> neighborPieces = new List<PuzzlePiece>();
+			bool touchingCore = false;
+
+			foreach (Vector3I d in dirs)
+			{
+				Vector3I neighborGrid = bestHole + d;
+				if (occupiedSlots.TryGetValue(neighborGrid, out PuzzlePiece neighbor))
+				{
+					if (!neighborPieces.Contains(neighbor))
+						neighborPieces.Add(neighbor);
+					if (neighbor.IsAttachedToCore)
+						touchingCore = true;
+				}
+			}
+
+			// Preencher peças alvo para a UI de Previsão de Encaixe
+			snapTargetPieces.Clear();
+			if (touchingCore && coreGroup.GetChildCount() > 0)
+			{
+				foreach (Node n in coreGroup.GetChildren())
+				{
+					if (n is PuzzlePiece cp && !snapTargetPieces.Contains(cp))
+						snapTargetPieces.Add(cp);
+				}
+			}
+			else
+			{
+				snapTargetPieces.AddRange(neighborPieces);
+			}
+
+			// Validação de compatibilidade das faces
+			bool isValid = ValidateSpecificSnapPosition(bestHole, occupiedSlots);
+			isCurrentlyValidSnap = isValid;
+
+			if (isValid)
+			{
+				ghostMat.AlbedoColor = new Color(0, 1, 0, 0.4f); // Verde = compatível
+			}
+			else
+			{
+				ghostMat.AlbedoColor = new Color(1, 0, 0, 0.5f); // Vermelho = colisão ou incompatível/liso
+			}
+		}
+		else
 		{
 			snapGhost.Visible = false;
+			isCurrentlyValidSnap = false;
+			snapTargetPieces.Clear();
 		}
 	}
 
@@ -170,42 +206,34 @@ public partial class OrbitCamera
 		);
 	}
 
-	private bool ValidateSpecificSnapPosition(Vector3I draggedGridPos, HashSet<Vector3I> occupiedSlots)
+	private bool ValidateSpecificSnapPosition(Vector3I draggedGridPos, Dictionary<Vector3I, PuzzlePiece> occupiedSlots)
 	{
 		bool isValid = true; 
 		bool touchingAny = false;
 
-		if (occupiedSlots != null && occupiedSlots.Contains(draggedGridPos)) return false;
+		if (occupiedSlots == null || occupiedSlots.ContainsKey(draggedGridPos)) return false;
 
-		foreach (Node node in coreGroup.GetChildren())
+		Vector3I[] dirs = { Vector3I.Up, Vector3I.Down, Vector3I.Right, Vector3I.Left, Vector3I.Forward, Vector3I.Back };
+
+		foreach (Vector3I d in dirs)
 		{
-			if (node is PuzzlePiece p)
+			Vector3I neighborGrid = draggedGridPos + d;
+			if (occupiedSlots.TryGetValue(neighborGrid, out PuzzlePiece p))
 			{
-				Vector3I pGrid = new Vector3I(
-					Mathf.RoundToInt(p.GlobalPosition.X / 2f), 
-					Mathf.RoundToInt(p.GlobalPosition.Y / 2f), 
-					Mathf.RoundToInt(p.GlobalPosition.Z / 2f)
-				);
-				
-				Vector3I diff = draggedGridPos - pGrid;
-				int dist = Mathf.Abs(diff.X) + Mathf.Abs(diff.Y) + Mathf.Abs(diff.Z);
+				touchingAny = true;
+				Vector3 globalDirToOther = new Vector3(d.X, d.Y, d.Z);
+				Vector3 globalDirToDragged = new Vector3(-d.X, -d.Y, -d.Z);
 
-				if (dist == 1) 
+				FaceType myFace = selectedPiece.GetFaceInGlobalDirection(globalDirToOther);
+				FaceType targetFace = p.GetFaceInGlobalDirection(globalDirToDragged);
+
+				if (!AreFacesCompatible(myFace, targetFace)) 
 				{
-					touchingAny = true;
-					Vector3 globalDirToCore = new Vector3(-diff.X, -diff.Y, -diff.Z);
-					Vector3 globalDirToDragged = new Vector3(diff.X, diff.Y, diff.Z);
-
-					FaceType myFace = selectedPiece.GetFaceInGlobalDirection(globalDirToCore);
-					FaceType targetFace = p.GetFaceInGlobalDirection(globalDirToDragged);
-
-					if (!AreFacesCompatible(myFace, targetFace)) 
-					{
-						isValid = false; 
-					}
+					isValid = false; 
 				}
 			}
 		}
+
 		return touchingAny && isValid;
 	}
 

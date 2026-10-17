@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 
 public partial class OrbitCamera : Node3D
 {
@@ -23,6 +24,8 @@ public partial class OrbitCamera : Node3D
 	private Vector3 currentSnapWorldPos;
 	private Vector3 targetPiecePosition;
 	private Vector3 targetCameraPosition;
+
+	private List<PuzzlePiece> snapTargetPieces = new List<PuzzlePiece>();
 
 	public override void _Ready()
 	{
