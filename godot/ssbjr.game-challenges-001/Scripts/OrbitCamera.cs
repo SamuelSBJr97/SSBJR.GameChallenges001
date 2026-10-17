@@ -1,7 +1,6 @@
 using Godot;
 using System;
 
-// O modificador 'partial' permite que a classe seja dividida.
 public partial class OrbitCamera : Node3D
 {
 	[Export] public float Sensitivity = 0.005f;
@@ -17,7 +16,6 @@ public partial class OrbitCamera : Node3D
 	private Node3D coreGroup;       
 	private bool isHoldingCore = false; 
 
-	// Fantasma de Encaixe
 	private MeshInstance3D snapGhost;
 	private StandardMaterial3D ghostMat;
 
@@ -26,34 +24,29 @@ public partial class OrbitCamera : Node3D
 	private Vector3 targetPiecePosition;
 	private Vector3 targetCameraPosition;
 
-	// UI e Minimapa 3D
-	private Label helpLabel;
-	private SubViewport minimapViewport;
-	private Camera3D minimapCamera;
-	private Node3D minimapRoot;
-
 	public override void _Ready()
 	{
 		camera = GetNode<Camera3D>("Camera3D");
 		targetCameraPosition = GlobalPosition; 
 		
-		SetupGhostCube(); // Definido em OrbitCamera.Logic.cs
+		SetupGhostCube(); 
 
 		coreGroup = new Node3D();
 		coreGroup.Name = "CoreAssembly";
 		GetParent().CallDeferred(Node.MethodName.AddChild, coreGroup);
 
-		Build3DMinimapUI(); // Definido em OrbitCamera.UI.cs
+		LoadTextures();
+		Build2DMinimapUI(); 
 	}
 
 	public override void _Process(double delta)
 	{
-		UpdateUIProcess(); // Definido em OrbitCamera.UI.cs
+		UpdateUIProcess(); 
 	}
 
 	public override void _PhysicsProcess(double delta)
 	{
-		HandleMovementProcess(delta); // Definido em OrbitCamera.Logic.cs
-		HandleSnappingProcess(delta); // Definido em OrbitCamera.Logic.cs
+		HandleMovementProcess(delta); 
+		HandleSnappingProcess(delta); 
 	}
 }

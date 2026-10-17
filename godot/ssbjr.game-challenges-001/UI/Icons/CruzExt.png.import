@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://2ripyx4677w7"
-path="res://.godot/imported/Flat.png-a361dac0187e31aaae37f9be62bd847c.ctex"
+uid="uid://dss6oeef00qx0"
+path="res://.godot/imported/CruzExt.png-f7f70313346cb03a6fbde08678550db2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Icons/Flat.png"
-dest_files=["res://.godot/imported/Flat.png-a361dac0187e31aaae37f9be62bd847c.ctex"]
+source_file="res://UI/Icons/CruzExt.png"
+dest_files=["res://.godot/imported/CruzExt.png-f7f70313346cb03a6fbde08678550db2.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dss6oeef00qx0"
-path="res://.godot/imported/CruzExt.png-28dbfe4ff0927b9bd8414fbbba947df0.ctex"
+uid="uid://d3wuw3g4x30mv"
+path="res://.godot/imported/QuadInt.png-093fe436655e40bdc508ad3212d35717.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Icons/CruzExt.png"
-dest_files=["res://.godot/imported/CruzExt.png-28dbfe4ff0927b9bd8414fbbba947df0.ctex"]
+source_file="res://UI/Icons/QuadInt.png"
+dest_files=["res://.godot/imported/QuadInt.png-093fe436655e40bdc508ad3212d35717.ctex"]
 
 [params]
 

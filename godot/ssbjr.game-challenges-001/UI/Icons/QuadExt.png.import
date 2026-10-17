@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://buqs5lflvuj4l"
-path="res://.godot/imported/CircInt.png-c4b9560718d63e422dba2e0dacb089bf.ctex"
+uid="uid://5riysj8vfbkv"
+path="res://.godot/imported/QuadExt.png-bbe29e82dd637da9223cdc42aeb43e0e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Icons/CircInt.png"
-dest_files=["res://.godot/imported/CircInt.png-c4b9560718d63e422dba2e0dacb089bf.ctex"]
+source_file="res://UI/Icons/QuadExt.png"
+dest_files=["res://.godot/imported/QuadExt.png-bbe29e82dd637da9223cdc42aeb43e0e.ctex"]
 
 [params]
 

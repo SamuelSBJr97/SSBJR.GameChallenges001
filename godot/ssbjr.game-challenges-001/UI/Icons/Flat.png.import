@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ctrds0pddh83g"
-path="res://.godot/imported/CruzInt.png-deee46db6638e2601484152db5605f26.ctex"
+uid="uid://2ripyx4677w7"
+path="res://.godot/imported/Flat.png-f9c0a20b4ce8f5d11d32adcc33a4f8b5.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Icons/CruzInt.png"
-dest_files=["res://.godot/imported/CruzInt.png-deee46db6638e2601484152db5605f26.ctex"]
+source_file="res://UI/Icons/Flat.png"
+dest_files=["res://.godot/imported/Flat.png-f9c0a20b4ce8f5d11d32adcc33a4f8b5.ctex"]
 
 [params]
 

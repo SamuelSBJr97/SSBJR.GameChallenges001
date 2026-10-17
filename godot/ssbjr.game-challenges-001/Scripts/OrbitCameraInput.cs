@@ -62,8 +62,6 @@ public partial class OrbitCamera
 				
 				foreach (Node n in coreGroup.GetChildren()) 
 					if (n is PuzzlePiece p) p.SetSelected(true);
-				
-				RefreshMinimap(); 
 			}
 			else
 			{
@@ -74,8 +72,6 @@ public partial class OrbitCamera
 				selectedPiece.SetSelected(true);
 				targetPiecePosition = selectedPiece.GlobalPosition;
 				SnapPieceRotationToGrid(selectedPiece);
-				
-				RefreshMinimap(); 
 			}
 		}
 		else
@@ -98,7 +94,6 @@ public partial class OrbitCamera
 			isHoldingCore = false;
 			selectedPiece = null; 
 			snapGhost.Visible = false;
-			RefreshMinimap(); 
 			return;
 		}
 
@@ -125,7 +120,6 @@ public partial class OrbitCamera
 			selectedPiece.SetSelected(false);
 			selectedPiece = null;
 			snapGhost.Visible = false;
-			RefreshMinimap(); 
 		}
 	}
 
