@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 
 public partial class OrbitCamera
 {
@@ -81,43 +82,67 @@ public partial class OrbitCamera
 			else
 			{
 				Vector3 piecePos = selectedPiece.GlobalPosition;
-				Vector3 bestWorldPos = Vector3.Zero;
-				float minDistance = 4.0f;
-				isCurrentlyValidSnap = false;
-				bool foundSnap = false;
-
-				Vector3[] dirs = { Vector3.Up * 2f, Vector3.Down * 2f, Vector3.Right * 2f, Vector3.Left * 2f, Vector3.Forward * 2f, Vector3.Back * 2f };
 				
+				// 1. Mapeamento Sólido (Onde já existem peças coladas)
+				HashSet<Vector3I> occupiedSlots = new HashSet<Vector3I>();
 				foreach (Node node in coreGroup.GetChildren())
 				{
 					if (node is PuzzlePiece p)
 					{
-						foreach (Vector3 d in dirs)
+						Vector3I pGrid = new Vector3I(
+							Mathf.RoundToInt(p.GlobalPosition.X / 2f), 
+							Mathf.RoundToInt(p.GlobalPosition.Y / 2f), 
+							Mathf.RoundToInt(p.GlobalPosition.Z / 2f)
+						);
+						occupiedSlots.Add(pGrid);
+					}
+				}
+
+				// 2. Extrator de Buracos Válidos (Impede que a lógica avalie espaços ocupados)
+				Vector3I[] dirs = { Vector3I.Up, Vector3I.Down, Vector3I.Right, Vector3I.Left, Vector3I.Forward, Vector3I.Back };
+				HashSet<Vector3I> validHoles = new HashSet<Vector3I>();
+				
+				foreach (Vector3I occ in occupiedSlots)
+				{
+					foreach (Vector3I d in dirs)
+					{
+						Vector3I hole = occ + d;
+						if (!occupiedSlots.Contains(hole))
 						{
-							Vector3 checkPos = p.GlobalPosition + d;
-							float dist = piecePos.DistanceTo(checkPos);
-							
-							if (dist < minDistance)
-							{
-								Vector3I checkGrid = new Vector3I(Mathf.RoundToInt(checkPos.X/2f), Mathf.RoundToInt(checkPos.Y/2f), Mathf.RoundToInt(checkPos.Z/2f));
-								bool isValid = ValidateSpecificSnapPosition(checkGrid);
-								
-								minDistance = dist;
-								bestWorldPos = checkPos;
-								isCurrentlyValidSnap = isValid;
-								foundSnap = true;
-								currentSnapWorldPos = bestWorldPos;
-							}
+							validHoles.Add(hole);
 						}
 					}
 				}
 
+				// 3. Procura o buraco vazio mais próximo da peça
+				float minDistance = 5.0f; // Raio aumentado para agarrar de mais longe
+				bool foundSnap = false;
+				Vector3I bestHole = Vector3I.Zero;
+
+				foreach (Vector3I hole in validHoles)
+				{
+					Vector3 holeWorldPos = new Vector3(hole.X * 2f, hole.Y * 2f, hole.Z * 2f);
+					float dist = piecePos.DistanceTo(holeWorldPos);
+					if (dist < minDistance)
+					{
+						minDistance = dist;
+						bestHole = hole;
+						foundSnap = true;
+					}
+				}
+
+				// 4. Se encontrou buraco, valida as faces
 				if (foundSnap)
 				{
+					currentSnapWorldPos = new Vector3(bestHole.X * 2f, bestHole.Y * 2f, bestHole.Z * 2f);
+					isCurrentlyValidSnap = ValidateSpecificSnapPosition(bestHole, occupiedSlots);
+
 					snapGhost.GlobalPosition = currentSnapWorldPos;
 					snapGhost.Visible = true;
+					// Se as topologias forem incompatíveis, mostra caixa Vermelha
 					ghostMat.AlbedoColor = isCurrentlyValidSnap ? new Color(0, 1, 0, 0.4f) : new Color(1, 0, 0, 0.4f);
 
+					// Só atrai magneticamente se a luz for verde e a câmara não estiver a voar
 					if (isCurrentlyValidSnap && !isOrbiting)
 					{
 						selectedPiece.GlobalPosition = selectedPiece.GlobalPosition.Lerp(currentSnapWorldPos, (float)delta * 20f);
@@ -148,20 +173,28 @@ public partial class OrbitCamera
 		);
 	}
 
-	private bool ValidateSpecificSnapPosition(Vector3I draggedGridPos)
+	private bool ValidateSpecificSnapPosition(Vector3I draggedGridPos, HashSet<Vector3I> occupiedSlots)
 	{
 		bool isValid = true; 
 		bool touchingAny = false;
+
+		// Medida de segurança extra
+		if (occupiedSlots != null && occupiedSlots.Contains(draggedGridPos)) return false;
 
 		foreach (Node node in coreGroup.GetChildren())
 		{
 			if (node is PuzzlePiece p)
 			{
-				Vector3I pGrid = new Vector3I(Mathf.RoundToInt(p.GlobalPosition.X / 2f), Mathf.RoundToInt(p.GlobalPosition.Y / 2f), Mathf.RoundToInt(p.GlobalPosition.Z / 2f));
+				Vector3I pGrid = new Vector3I(
+					Mathf.RoundToInt(p.GlobalPosition.X / 2f), 
+					Mathf.RoundToInt(p.GlobalPosition.Y / 2f), 
+					Mathf.RoundToInt(p.GlobalPosition.Z / 2f)
+				);
+				
 				Vector3I diff = draggedGridPos - pGrid;
 				int dist = Mathf.Abs(diff.X) + Mathf.Abs(diff.Y) + Mathf.Abs(diff.Z);
 
-				if (dist == 1)
+				if (dist == 1) // Se estão a tocar
 				{
 					touchingAny = true;
 					Vector3 globalDirToCore = new Vector3(-diff.X, -diff.Y, -diff.Z);
@@ -170,8 +203,11 @@ public partial class OrbitCamera
 					FaceType myFace = selectedPiece.GetFaceInGlobalDirection(globalDirToCore);
 					FaceType targetFace = p.GetFaceInGlobalDirection(globalDirToDragged);
 
+					// A regra vital: as caras não podem ser lisas (Flat) e a soma tem de dar zero
 					if (myFace == FaceType.Flat || targetFace == FaceType.Flat || (int)myFace + (int)targetFace != 0)
+					{
 						isValid = false; 
+					}
 				}
 			}
 		}

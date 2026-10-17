@@ -1,14 +1,7 @@
 [gd_scene format=3 uid="uid://vue0fkpr6g0q"]
 
-[ext_resource type="Script" uid="uid://bocsp4ln8681s" path="res://Scripts/HeartPuzzleGenerator.cs" id="1_1vhx5"]
+[ext_resource type="Script" uid="uid://cwgiydp3hsxeb" path="res://Scripts/LevelChallenge.cs" id="1_o8dcu"]
 [ext_resource type="Script" uid="uid://cgqrpkvxng6qi" path="res://Scripts/OrbitCamera.cs" id="2_o8dcu"]
-[ext_resource type="PackedScene" uid="uid://cv3y2ack74ehp" path="res://Assets/Faces/Face_Liso.glb" id="2_rcxnc"]
-[ext_resource type="PackedScene" uid="uid://dm7aqk282e4pi" path="res://Assets/Faces/Face_Quad_Ext.glb" id="3_anejs"]
-[ext_resource type="PackedScene" uid="uid://boqjooly7ayrr" path="res://Assets/Faces/Face_Quad_Int.glb" id="4_62if2"]
-[ext_resource type="PackedScene" uid="uid://bk6scwanghf1r" path="res://Assets/Faces/Face_Circ_Ext.glb" id="5_plo27"]
-[ext_resource type="PackedScene" uid="uid://c7b2g71hqyoew" path="res://Assets/Faces/Face_Circ_Int.glb" id="6_5jnji"]
-[ext_resource type="PackedScene" uid="uid://bfbtcsbdubc68" path="res://Assets/Faces/Face_Cruz_Ext.glb" id="7_1ajds"]
-[ext_resource type="PackedScene" uid="uid://u8xvj1kgosij" path="res://Assets/Faces/Face_Cruz_Int.glb" id="8_t06dy"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_rcxnc"]
 size = Vector3(100, 1, 100)
@@ -22,14 +15,7 @@ size = Vector2(100, 100)
 transform = Transform3D(1, 0, 0, 0, 1.4869065, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="PuzzleGenerator" type="Node3D" parent="." unique_id=679849283]
-script = ExtResource("1_1vhx5")
-FaceLiso = ExtResource("2_rcxnc")
-FaceQuadExt = ExtResource("3_anejs")
-FaceQuadInt = ExtResource("4_62if2")
-FaceCircExt = ExtResource("5_plo27")
-FaceCircInt = ExtResource("6_5jnji")
-FaceCruzExt = ExtResource("7_1ajds")
-FaceCruzInt = ExtResource("8_t06dy")
+script = ExtResource("1_o8dcu")
 
 [node name="Floor" type="StaticBody3D" parent="." unique_id=273351490]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -10, 0)
