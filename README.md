@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Status](https://img.shields.io/badge/Status-MVP-orange)
 
-Uma recriação tridimensional e procedural inspirada no clássico jogo de tabuleiro "Cilada" (Estrela). Este projeto utiliza a **Godot Engine (C#)** para gerar desafios espaciais e topológicos onde o jogador precisa rotacionar e encaixar blocos com conectores complementares (Macho/Fêmea) para reconstruir uma forma tridimensional gerada aleatoriamente.
+Uma recriação tridimensional e procedural inspirada no clássico jogo de tabuleiro "Cilada" (Estrela). Este projeto utiliza a **Godot Engine (C#)** para gerar desafios espaciais e topológicos onde o jogador precisa rotacionar e encaixar blocos com conectores complementares (Extrusão/Intrusão) para reconstruir uma forma tridimensional gerada aleatoriamente.
 
 ## ✨ Características do MVP
 
